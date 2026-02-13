@@ -5,464 +5,464 @@
 
 <head>
     <meta charset="UTF-8">
-<script>
-    // [IMPORTANT] API Endpoint
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbySt-5WOOMa6B3Wh8H3Wk4pc8jyjzBVNfcklXDzTRWv7wXTbG86Jl2frDTclCMTOz1-/exec";
+    <script>
+        // [IMPORTANT] API Endpoint
+        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbySt-5WOOMa6B3Wh8H3Wk4pc8jyjzBVNfcklXDzTRWv7wXTbG86Jl2frDTclCMTOz1-/exec";
 
-    // Polyfill for google.script.run to support chaining
-    window.google = window.google || {};
-    window.google.script = window.google.script || {};
+        // Polyfill for google.script.run to support chaining
+        window.google = window.google || {};
+        window.google.script = window.google.script || {};
 
-    const createRunner = (successHandler, failureHandler) => {
-        const chain = {
-            withSuccessHandler: (f) => createRunner(f, failureHandler),
-            withFailureHandler: (f) => createRunner(successHandler, f)
+        const createRunner = (successHandler, failureHandler) => {
+            const chain = {
+                withSuccessHandler: (f) => createRunner(f, failureHandler),
+                withFailureHandler: (f) => createRunner(successHandler, f)
+            };
+
+            return new Proxy(chain, {
+                get: (target, prop) => {
+                    if (prop in target) return target[prop];
+                    return (...args) => executeApi(prop, args, successHandler, failureHandler);
+                }
+            });
         };
 
-        return new Proxy(chain, {
-            get: (target, prop) => {
-                if (prop in target) return target[prop];
-                return (...args) => executeApi(prop, args, successHandler, failureHandler);
+        function executeApi(funcName, args, onSuccess, onFailure) {
+            console.log(`[API Call] ${funcName}`, args);
+
+            if (funcName === "getFullSystemSync") {
+                // Local Cache Check
+                const localData = localStorage.getItem("FSJH_FULL_SYNC");
+                let usedCache = false;
+                if (localData) {
+                    try {
+                        const parsed = JSON.parse(localData);
+                        if (new Date().getTime() - parsed.timestamp < 3600000) { // 1 Hour Cache
+                            console.log("[API] Using Local Cache");
+                            if (onSuccess) onSuccess(parsed.data);
+                            usedCache = true;
+                        }
+                    } catch (e) { localStorage.removeItem("FSJH_FULL_SYNC"); }
+                }
+
+                // Network Fetch
+                fetch(GAS_API_URL + "?api=true")
+                    .then(res => {
+                        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+                        return res.json();
+                    })
+                    .then(data => {
+                        console.log("[API] Fresh Data Received");
+                        localStorage.setItem("FSJH_FULL_SYNC", JSON.stringify({
+                            timestamp: new Date().getTime(),
+                            data: data
+                        }));
+
+                        // Only invoke callback if we haven't used cache, OR if we want to update UI live.
+                        // To strictly match GAS behavior (one callback), we usually only call once.
+                        // But here we want 'stale-while-revalidate' strategy.
+                        // If usedCache is true, we might skip, OR call again to refresh.
+                        // For now, let's call it again to ensure fresh data is shown.
+                        if (onSuccess) onSuccess(data);
+                    })
+                    .catch(err => {
+                        console.error("[API] Fetch Error:", err);
+                        if (onFailure) onFailure(err);
+                    });
+            } else {
+                console.warn(`Function ${funcName} is not supported in Adapter mode.`);
             }
-        });
-    };
+        }
 
-    function executeApi(funcName, args, onSuccess, onFailure) {
-        console.log(`[API Call] ${funcName}`, args);
+        // Initialize the runner
+        window.google.script.run = createRunner(null, null);
 
-        if (funcName === "getFullSystemSync") {
-            // Local Cache Check
-            const localData = localStorage.getItem("FSJH_FULL_SYNC");
-            let usedCache = false;
-            if (localData) {
-                try {
-                    const parsed = JSON.parse(localData);
-                    if (new Date().getTime() - parsed.timestamp < 3600000) { // 1 Hour Cache
-                        console.log("[API] Using Local Cache");
-                        if (onSuccess) onSuccess(parsed.data);
-                        usedCache = true;
-                    }
-                } catch (e) { localStorage.removeItem("FSJH_FULL_SYNC"); }
-            }
-
-            // Network Fetch
-            fetch(GAS_API_URL + "?api=true")
-                .then(res => {
-                    if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-                    return res.json();
-                })
-                .then(data => {
-                    console.log("[API] Fresh Data Received");
-                    localStorage.setItem("FSJH_FULL_SYNC", JSON.stringify({
-                        timestamp: new Date().getTime(),
-                        data: data
-                    }));
-
-                    // Only invoke callback if we haven't used cache, OR if we want to update UI live.
-                    // To strictly match GAS behavior (one callback), we usually only call once.
-                    // But here we want 'stale-while-revalidate' strategy.
-                    // If usedCache is true, we might skip, OR call again to refresh.
-                    // For now, let's call it again to ensure fresh data is shown.
-                    if (onSuccess) onSuccess(data);
-                })
-                .catch(err => {
-                    console.error("[API] Fetch Error:", err);
-                    if (onFailure) onFailure(err);
+        // Mock History (keeps URL clean)
+        window.google.script.history = {
+            push: function (state, params, hash) {
+                console.log("[History] Push:", state, params, hash);
+                const url = new URL(window.location);
+                if (hash) {
+                    url.searchParams.set("page", hash);
+                    window.history.pushState(state, "", url);
+                }
+            },
+            setChangeHandler: function (callback) {
+                window.addEventListener("popstate", () => {
+                    const params = {};
+                    new URL(window.location).searchParams.forEach((v, k) => params[k] = v);
+                    callback({ location: { parameter: params } });
                 });
-        } else {
-            console.warn(`Function ${funcName} is not supported in Adapter mode.`);
-        }
-    }
-
-    // Initialize the runner
-    window.google.script.run = createRunner(null, null);
-
-    // Mock History (keeps URL clean)
-    window.google.script.history = {
-        push: function (state, params, hash) {
-            console.log("[History] Push:", state, params, hash);
-            const url = new URL(window.location);
-            if (hash) {
-                url.searchParams.set("page", hash);
-                window.history.pushState(state, "", url);
             }
-        },
-        setChangeHandler: function (callback) {
-            window.addEventListener("popstate", () => {
-                const params = {};
-                new URL(window.location).searchParams.forEach((v, k) => params[k] = v);
-                callback({ location: { parameter: params } });
-            });
-        }
-    };
-</script>
+        };
+    </script>
     <base target="_top">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=1200, user-scalable=yes">
     <link
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&family=Noto+Sans+TC:wght@300;400;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- @version v4.9.9 -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --primary-color: #2980b9;
-    --secondary-color: #2c3e50;
-    --accent-color: #3498db;
-    --bg-color: #f0f3f5;
-    --surface-color: #ffffff;
-    --text-color: #3c4043;
-    --subtle-gray: #dcdde1;
-    --tt-header-bg: #dfe6e9;
-  }
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2980b9;
+            --secondary-color: #2c3e50;
+            --accent-color: #3498db;
+            --bg-color: #f0f3f5;
+            --surface-color: #ffffff;
+            --text-color: #3c4043;
+            --subtle-gray: #dcdde1;
+            --tt-header-bg: #dfe6e9;
+        }
 
-  /* 核心修正：徹底封印 Chrome 的 Font Boosting (這是停頓一秒後卡住的主因) */
-  html,
-  body {
-    -webkit-text-size-adjust: none !important;
-    text-size-adjust: none !important;
-    margin: 0;
-    padding: 0;
-    background-color: var(--bg-color);
-  }
+        /* 核心修正：徹底封印 Chrome 的 Font Boosting (這是停頓一秒後卡住的主因) */
+        html,
+        body {
+            -webkit-text-size-adjust: none !important;
+            text-size-adjust: none !important;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+        }
 
-  body {
-    font-family: 'Noto Sans TC', sans-serif;
-    color: var(--text-color);
-    font-size: 15px;
-    /* 移除之前所有會增加 Chrome 負擔的動畫與手勢限制 */
-  }
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            color: var(--text-color);
+            font-size: 15px;
+            /* 移除之前所有會增加 Chrome 負擔的動畫與手勢限制 */
+        }
 
-  .container {
-    max-width: 1000px;
-    margin: 10px auto;
-    padding: 12px 25px;
-    background-color: var(--surface-color);
-    border-radius: 12px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-  }
+        .container {
+            max-width: 1000px;
+            margin: 10px auto;
+            padding: 12px 25px;
+            background-color: var(--surface-color);
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+        }
 
-  .global-nav {
-    min-height: 40px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 8px;
-  }
+        .global-nav {
+            min-height: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
 
-  .nav-links {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-  }
+        .nav-links {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
 
-  .nav-links a {
-    text-decoration: none;
-    color: var(--primary-color);
-    font-weight: 500;
-    cursor: pointer;
-  }
+        .nav-links a {
+            text-decoration: none;
+            color: var(--primary-color);
+            font-weight: 500;
+            cursor: pointer;
+        }
 
-  .nav-links span {
-    color: #ddd;
-  }
+        .nav-links span {
+            color: #ddd;
+        }
 
-  h1 {
-    color: var(--secondary-color);
-    font-size: 1.5em;
-    font-weight: 700;
-    margin-bottom: 10px;
-    margin-top: 0;
-  }
+        h1 {
+            color: var(--secondary-color);
+            font-size: 1.5em;
+            font-weight: 700;
+            margin-bottom: 10px;
+            margin-top: 0;
+        }
 
-  .nav-btn {
-    background-color: var(--surface-color);
-    color: var(--primary-color);
-    border: 1.5px solid var(--primary-color);
-    padding: 5px 15px;
-    border-radius: 20px;
-    cursor: pointer;
-    font-size: 1.05em;
-    font-weight: 500;
-  }
+        .nav-btn {
+            background-color: var(--surface-color);
+            color: var(--primary-color);
+            border: 1.5px solid var(--primary-color);
+            padding: 5px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 1.05em;
+            font-weight: 500;
+        }
 
-  .nav-btn.active,
-  .nav-btn:hover {
-    background-color: var(--primary-color);
-    color: white;
-  }
+        .nav-btn.active,
+        .nav-btn:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
 
-  .search-box {
-    display: flex;
-    align-items: center;
-    border: 1px solid #ccc;
-    border-radius: 20px;
-    padding: 2px 12px;
-    background: white;
-  }
+        .search-box {
+            display: flex;
+            align-items: center;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            padding: 2px 12px;
+            background: white;
+        }
 
-  .search-input {
-    border: none;
-    outline: none;
-    padding: 5px 0;
-    width: 110px;
-    font-size: 0.9em;
-  }
+        .search-input {
+            border: none;
+            outline: none;
+            padding: 5px 0;
+            width: 110px;
+            font-size: 0.9em;
+        }
 
-  .staff-count-label {
-    font-size: 0.95em;
-    color: var(--secondary-color);
-    background-color: #f8f9fa;
-    padding: 4px 15px;
-    border-radius: 15px;
-    border: 1px solid #ddd;
-    font-weight: 500;
-  }
+        .staff-count-label {
+            font-size: 0.95em;
+            color: var(--secondary-color);
+            background-color: #f8f9fa;
+            padding: 4px 15px;
+            border-radius: 15px;
+            border: 1px solid #ddd;
+            font-weight: 500;
+        }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    text-align: center;
-  }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+        }
 
-  th,
-  td {
-    padding: 6px 8px;
-    border: 1px solid #ddd;
-    text-align: center !important;
-  }
+        th,
+        td {
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            text-align: center !important;
+        }
 
-  th {
-    background-color: var(--secondary-color) !important;
-    color: #ffffff !important;
-    font-weight: 500;
-  }
+        th {
+            background-color: var(--secondary-color) !important;
+            color: #ffffff !important;
+            font-weight: 500;
+        }
 
-  tr:nth-child(even) {
-    background-color: #f9fbfd;
-  }
+        tr:nth-child(even) {
+            background-color: #f9fbfd;
+        }
 
-  .timetable-table-wrap {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
+        .timetable-table-wrap {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
 
-  .timetable-table {
-    width: 720px;
-    margin: 0 auto;
-    table-layout: fixed;
-    border: 2px solid #2c3e50;
-  }
+        .timetable-table {
+            width: 720px;
+            margin: 0 auto;
+            table-layout: fixed;
+            border: 2px solid #2c3e50;
+        }
 
-  .timetable-table th {
-    background: var(--tt-header-bg) !important;
-    color: #000 !important;
-    font-weight: 700;
-    height: 38px;
-    border: 1.5px solid #2c3e50;
-  }
+        .timetable-table th {
+            background: var(--tt-header-bg) !important;
+            color: #000 !important;
+            font-weight: 700;
+            height: 38px;
+            border: 1.5px solid #2c3e50;
+        }
 
-  .timetable-table td {
-    height: 52px;
-    padding: 2px !important;
-    border: 1px solid #999999;
-  }
+        .timetable-table td {
+            height: 52px;
+            padding: 2px !important;
+            border: 1px solid #999999;
+        }
 
-  .period-label {
-    background-color: #ebf2f6 !important;
-    font-weight: bold;
-    width: 70px;
-    color: #2c3e50 !important;
-    border-right: 2px solid #2c3e50 !important;
-  }
+        .period-label {
+            background-color: #ebf2f6 !important;
+            font-weight: bold;
+            width: 70px;
+            color: #2c3e50 !important;
+            border-right: 2px solid #2c3e50 !important;
+        }
 
-  .subject-name {
-    font-weight: 700;
-    color: #000;
-    font-size: 1.1em;
-    line-height: 1.2;
-    display: block;
-  }
+        .subject-name {
+            font-weight: 700;
+            color: #000;
+            font-size: 1.1em;
+            line-height: 1.2;
+            display: block;
+        }
 
-  .link-text {
-    color: var(--accent-color);
-    text-decoration: none;
-    font-size: 0.85em;
-    font-weight: 500;
-    display: block;
-    cursor: pointer;
-  }
+        .link-text {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-size: 0.85em;
+            font-weight: 500;
+            display: block;
+            cursor: pointer;
+        }
 
-  .print-btn {
-    background: #34495e;
-    color: white;
-    border: none;
-    padding: 4px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.85em;
-  }
+        .print-btn {
+            background: #34495e;
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
 
-  .toast-msg {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(44, 62, 80, 0.9);
-    color: white;
-    padding: 12px 25px;
-    border-radius: 30px;
-    z-index: 9999;
-    display: none;
-    font-weight: bold;
-  }
+        .toast-msg {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(44, 62, 80, 0.9);
+            color: white;
+            padding: 12px 25px;
+            border-radius: 30px;
+            z-index: 9999;
+            display: none;
+            font-weight: bold;
+        }
 
-  .site-footer {
-    text-align: center;
-    font-size: 0.75rem;
-    color: #94a3b8;
-    padding: 15px 0;
-    width: 100%;
-    margin-top: auto;
-    line-height: 1.6;
-  }
+        .site-footer {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            padding: 15px 0;
+            width: 100%;
+            margin-top: auto;
+            line-height: 1.6;
+        }
 
-  @media print {
+        @media print {
 
-    .global-nav,
-    .print-btn,
-    .nav-btn,
-    .search-box,
-    .staff-count-label,
-    .toast-msg,
-    .no-print {
-      display: none !important;
-    }
+            .global-nav,
+            .print-btn,
+            .nav-btn,
+            .search-box,
+            .staff-count-label,
+            .toast-msg,
+            .no-print {
+                display: none !important;
+            }
 
-    .container {
-      box-shadow: none !important;
-      border: none !important;
-      width: 100% !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
+            .container {
+                box-shadow: none !important;
+                border: none !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
 
-    .timetable-table {
-      width: 95% !important;
-      border: 1.5px solid black !important;
-    }
+            .timetable-table {
+                width: 95% !important;
+                border: 1.5px solid black !important;
+            }
 
-    th,
-    td {
-      border: 1px solid black !important;
-      color: black !important;
-    }
-  }
-</style>
-<div id="toast" class="toast-msg"></div>
-<script>
-  function showToast(msg) {
-    const toast = document.getElementById('toast'); toast.textContent = msg; toast.style.display = 'block';
-    setTimeout(() => { toast.style.display = 'none'; }, 3000);
-  }
+            th,
+            td {
+                border: 1px solid black !important;
+                color: black !important;
+            }
+        }
+    </style>
+    <div id="toast" class="toast-msg"></div>
+    <script>
+        function showToast(msg) {
+            const toast = document.getElementById('toast'); toast.textContent = msg; toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
 
-  let clientIP = "";
-  async function getUserIP() {
-    if (clientIP) return clientIP;
-    try {
-      const res = await fetch('https://api.ipify.org?format=json');
-      const data = await res.json();
-      clientIP = data.ip;
-      return clientIP;
-    } catch (e) { return ""; }
-  }
+        let clientIP = "";
+        async function getUserIP() {
+            if (clientIP) return clientIP;
+            try {
+                const res = await fetch('https://api.ipify.org?format=json');
+                const data = await res.json();
+                clientIP = data.ip;
+                return clientIP;
+            } catch (e) { return ""; }
+        }
 
-  function getDisplayName(t, settings, isInternalEmail) {
-    if (!t) return "";
-    const mode = settings ? (settings.mode || 'OFF') : 'OFF';
-    const name = t.name || t.teacher || "";
-    let maskedName = t.maskedName || t.maskedTeacher || "";
-    if (!maskedName && name) maskedName = (name.length > 0) ? name[0] + '老師' : name;
-    if (mode === 'ALL') return maskedName;
-    if (mode === 'OFF') return name;
-    if (isInternalEmail) return name;
-    if (clientIP && settings.allowedIp && clientIP.startsWith(settings.allowedIp)) return name;
-    return maskedName;
-  }
+        function getDisplayName(t, settings, isInternalEmail) {
+            if (!t) return "";
+            const mode = settings ? (settings.mode || 'OFF') : 'OFF';
+            const name = t.name || t.teacher || "";
+            let maskedName = t.maskedName || t.maskedTeacher || "";
+            if (!maskedName && name) maskedName = (name.length > 0) ? name[0] + '老師' : name;
+            if (mode === 'ALL') return maskedName;
+            if (mode === 'OFF') return name;
+            if (isInternalEmail) return name;
+            if (clientIP && settings.allowedIp && clientIP.startsWith(settings.allowedIp)) return name;
+            return maskedName;
+        }
 
-  const FECache = {
-    TTL: 3600 * 1000 * 6,
-    set: function (key, data) {
-      const cacheObj = { timestamp: new Date().getTime(), data: data };
-      localStorage.setItem('FSJH_FE_' + key, JSON.stringify(cacheObj));
-    },
-    get: function (key) {
-      const raw = localStorage.getItem('FSJH_FE_' + key);
-      if (!raw) return null;
-      try {
-        const cacheObj = JSON.parse(raw);
-        const now = new Date().getTime();
-        if (now - cacheObj.timestamp > this.TTL) cacheObj.stale = true;
-        return cacheObj;
-      } catch (e) { return null; }
-    },
-    getDB: function () {
-      const sync = this.get('FULL_SYNC');
-      return sync ? sync.data : null;
-    },
-    clear: function () {
-      Object.keys(localStorage).forEach(key => { if (key.startsWith('FSJH_FE_')) localStorage.removeItem(key); });
-    }
-  };
+        const FECache = {
+            TTL: 3600 * 1000 * 6,
+            set: function (key, data) {
+                const cacheObj = { timestamp: new Date().getTime(), data: data };
+                localStorage.setItem('FSJH_FE_' + key, JSON.stringify(cacheObj));
+            },
+            get: function (key) {
+                const raw = localStorage.getItem('FSJH_FE_' + key);
+                if (!raw) return null;
+                try {
+                    const cacheObj = JSON.parse(raw);
+                    const now = new Date().getTime();
+                    if (now - cacheObj.timestamp > this.TTL) cacheObj.stale = true;
+                    return cacheObj;
+                } catch (e) { return null; }
+            },
+            getDB: function () {
+                const sync = this.get('FULL_SYNC');
+                return sync ? sync.data : null;
+            },
+            clear: function () {
+                Object.keys(localStorage).forEach(key => { if (key.startsWith('FSJH_FE_')) localStorage.removeItem(key); });
+            }
+        };
 
-  function fetchWithCache(funcName, args, callback, cacheKey) {
-    const db = FECache.getDB();
-    if (db) {
-      let localResult = null;
-      if (funcName === 'getTeacherData') {
-        const scheduledTeachers = new Set(db.schedules.map(r => r.tname));
-        localResult = { success: true, teachers: db.teachers.map(t => ({ ...t, hasSchedule: scheduledTeachers.has(t.name) })), settings: db.settings, isInternalEmail: db.isInternalEmail };
-      } else if (funcName === 'getClassList') {
-        const classStats = new Map();
-        db.schedules.forEach(row => {
-          if (!classStats.has(row.classCode)) classStats.set(row.classCode, { count: 0, hasCore: false, name: row.className });
-          const stat = classStats.get(row.classCode);
-          stat.count++;
-          if (parseInt(row.period) >= 1 && parseInt(row.period) <= 7) stat.hasCore = true;
-        });
-        localResult = { success: true, classes: Array.from(classStats.entries()).filter(([code, stat]) => stat.count > 3 && stat.hasCore).map(([code, stat]) => ({ code, name: stat.name })).sort((a, b) => a.code.localeCompare(b.code)) };
-      } else if (funcName === 'getTeacherTimetable') {
-        const id = args[0]; const rows = db.schedules.filter(row => row.tid === id);
-        const timetable = {}; let realName = "";
-        rows.forEach(row => {
-          if (!timetable[row.day]) timetable[row.day] = {}; if (!realName) realName = row.tname;
-          timetable[row.day][row.period] = { subjectName: row.subjectName, subjectCode: row.subjectCode, className: row.className, classCode: row.classCode };
-        });
-        const masked = (rows.length > 0) ? (rows[0].maskedTeacher || rows[0].tname) : "";
-        localResult = { success: true, timetable, teacherName: realName, maskedName: masked, settings: db.settings, isInternalEmail: db.isInternalEmail };
-      } else if (funcName === 'getClassTimetable') {
-        const classCode = args[0]; const classRows = db.schedules.filter(row => row.classCode === classCode);
-        const timetable = {};
-        classRows.forEach(row => {
-          if (!timetable[row.day]) timetable[row.day] = {};
-          timetable[row.day][row.period] = { subjectName: row.subjectName, teacher: row.tname, maskedTeacher: row.maskedTeacher || row.tname, teacherId: row.tid };
-        });
-        localResult = { success: true, timetable, className: classRows.length > 0 ? classRows[0].className : classCode, settings: db.settings, isInternalEmail: db.isInternalEmail };
-      }
-      if (localResult) { callback(localResult, true); return; }
-    }
-    const cached = FECache.get(cacheKey);
-    if (cached) callback(cached.data, true);
-    google.script.run.withSuccessHandler(res => {
-      if (res && res.success) { FECache.set(cacheKey, res); callback(res, false); }
-    })[funcName].apply(null, args);
-  }
-</script>
+        function fetchWithCache(funcName, args, callback, cacheKey) {
+            const db = FECache.getDB();
+            if (db) {
+                let localResult = null;
+                if (funcName === 'getTeacherData') {
+                    const scheduledTeachers = new Set(db.schedules.map(r => r.tname));
+                    localResult = { success: true, teachers: db.teachers.map(t => ({ ...t, hasSchedule: scheduledTeachers.has(t.name) })), settings: db.settings, isInternalEmail: db.isInternalEmail };
+                } else if (funcName === 'getClassList') {
+                    const classStats = new Map();
+                    db.schedules.forEach(row => {
+                        if (!classStats.has(row.classCode)) classStats.set(row.classCode, { count: 0, hasCore: false, name: row.className });
+                        const stat = classStats.get(row.classCode);
+                        stat.count++;
+                        if (parseInt(row.period) >= 1 && parseInt(row.period) <= 7) stat.hasCore = true;
+                    });
+                    localResult = { success: true, classes: Array.from(classStats.entries()).filter(([code, stat]) => stat.count > 3 && stat.hasCore).map(([code, stat]) => ({ code, name: stat.name })).sort((a, b) => a.code.localeCompare(b.code)) };
+                } else if (funcName === 'getTeacherTimetable') {
+                    const id = args[0]; const rows = db.schedules.filter(row => row.tid === id);
+                    const timetable = {}; let realName = "";
+                    rows.forEach(row => {
+                        if (!timetable[row.day]) timetable[row.day] = {}; if (!realName) realName = row.tname;
+                        timetable[row.day][row.period] = { subjectName: row.subjectName, subjectCode: row.subjectCode, className: row.className, classCode: row.classCode };
+                    });
+                    const masked = (rows.length > 0) ? (rows[0].maskedTeacher || rows[0].tname) : "";
+                    localResult = { success: true, timetable, teacherName: realName, maskedName: masked, settings: db.settings, isInternalEmail: db.isInternalEmail };
+                } else if (funcName === 'getClassTimetable') {
+                    const classCode = args[0]; const classRows = db.schedules.filter(row => row.classCode === classCode);
+                    const timetable = {};
+                    classRows.forEach(row => {
+                        if (!timetable[row.day]) timetable[row.day] = {};
+                        timetable[row.day][row.period] = { subjectName: row.subjectName, teacher: row.tname, maskedTeacher: row.maskedTeacher || row.tname, teacherId: row.tid };
+                    });
+                    localResult = { success: true, timetable, className: classRows.length > 0 ? classRows[0].className : classCode, settings: db.settings, isInternalEmail: db.isInternalEmail };
+                }
+                if (localResult) { callback(localResult, true); return; }
+            }
+            const cached = FECache.get(cacheKey);
+            if (cached) callback(cached.data, true);
+            google.script.run.withSuccessHandler(res => {
+                if (res && res.success) { FECache.set(cacheKey, res); callback(res, false); }
+            })[funcName].apply(null, args);
+        }
+    </script>
     <style>
         /* 全局重置與基礎設定 */
         body {
