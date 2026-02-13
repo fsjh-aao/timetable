@@ -1281,10 +1281,10 @@
 
 
     <script>
-        const initialSyncData = <?!= JSON.stringify(initialSync || null) ?>;
-        const initialPage = '<?= initialPage ?>';
-        const initialParams = <?!= JSON.stringify(initialParams || {}) ?>;
-        const baseUrl = "<?= ScriptApp.getService().getUrl() ?>";
+        const initialSyncData = null;
+        const initialPage = 'index';
+        const initialParams = {};
+        const baseUrl = "https://script.google.com/macros/s/AKfycbySt-5WOOMa6B3Wh8H3Wk4pc8jyjzBVNfcklXDzTRWv7wXTbG86Jl2frDTclCMTOz1-/exec";
 
         // 狀態管理物件 (用於虛擬分頁重繪時恢復狀態)
         const pageStates = {
