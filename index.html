@@ -1,109 +1,479 @@
+<!-- @version v6.6.0 -->
+<!-- @date 2026-02-09 -->
 <!DOCTYPE html>
 <html>
 
-<head>
+<head><script>
+    // [IMPORTANT] API Endpoint
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbySt-5WOOMa6B3Wh8H3Wk4pc8jyjzBVNfcklXDzTRWv7wXTbG86Jl2frDTclCMTOz1-/exec";
+
+    // Polyfill for google.script.run
+    window.google = window.google || {};
+    window.google.script = window.google.script || {};
+
+    // Mock History
+    window.google.script.history = {
+        push: function (state, params, hash) {
+            console.log("[History] Push:", state, params, hash);
+            const url = new URL(window.location);
+            if (hash) {
+                url.searchParams.set("page", hash);
+                window.history.pushState(state, "", url);
+            }
+        },
+        setChangeHandler: function (callback) {
+            window.addEventListener("popstate", () => {
+                const params = {};
+                new URL(window.location).searchParams.forEach((v, k) => params[k] = v);
+                callback({ location: { parameter: params } });
+            });
+        }
+    };
+
+    // Mock Run
+    window.google.script.run = {
+        withFailureHandler: function (callback) {
+            this.failureHandler = callback;
+            return this;
+        },
+        withSuccessHandler: function (callback) {
+            return new Proxy({}, {
+                get: function (target, prop) {
+                    return function (...args) {
+                        console.log("[API Call] " + prop, args);
+
+                        if (prop === "getFullSystemSync") {
+                            // Check Local Cache First (Speedup)
+                            const localData = localStorage.getItem("FSJH_FULL_SYNC");
+                            let usedCache = false;
+
+                            if (localData) {
+                                try {
+                                    const parsed = JSON.parse(localData);
+                                    // 1 hour cache validity for initial load speedup
+                                    if (new Date().getTime() - parsed.timestamp < 3600000) {
+                                        console.log("[API] Using Local Cache");
+                                        callback(parsed.data);
+                                        usedCache = true;
+                                    }
+                                } catch (e) { localStorage.removeItem("FSJH_FULL_SYNC"); }
+                            }
+
+                            // Fetch Fresh Data
+                            fetch(GAS_API_URL + "?api=true")
+                                .then(res => res.json())
+                                .then(data => {
+                                    console.log("[API] Fresh Data Received");
+                                    // Update Cache
+                                    localStorage.setItem("FSJH_FULL_SYNC", JSON.stringify({
+                                        timestamp: new Date().getTime(),
+                                        data: data
+                                    }));
+
+                                    // If we didn't use cache, or if data is newer, call callback
+                                    // Note: If usedCache is true, we might want to refresh UI silently or notify user
+                                    if (!usedCache) {
+                                        callback(data);
+                                    } else {
+                                        console.log("[API] Background update completed");
+                                        // Optional: Call callback again to update UI with fresh data if needed
+                                        // callback(data); 
+                                    }
+                                })
+                                .catch(err => {
+                                    console.error("[API] Error:", err);
+                                    if (window.google.script.run.failureHandler) {
+                                        window.google.script.run.failureHandler(err);
+                                    }
+                                });
+                        } else {
+                            console.warn("Function " + prop + " is not supported in API mode or should be handled locally.");
+                        }
+                    }
+                }
+            });
+        }
+    };
+</script>
     <base target="_top">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ë™≤Ë°®Êü•Ë©¢Á≥ªÁµ±</title>
-    <!-- Fonts -->
     <link
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&family=Noto+Sans+TC:wght@300;400;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- @version v4.9.9 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary-color: #2980b9;
+    --secondary-color: #2c3e50;
+    --accent-color: #3498db;
+    --bg-color: #f0f3f5;
+    --surface-color: #ffffff;
+    --text-color: #3c4043;
+    --subtle-gray: #dcdde1;
+    --tt-header-bg: #dfe6e9;
+  }
 
-    <!-- GAS API Configuration -->
-    <script>
-        // [IMPORTANT] This ID points to the original GAS project script
-        const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbySt-5WOOMa6B3Wh8H3Wk4pc8jyjzBVNfcklXDzTRWv7wXTbG86Jl2frDTclCMTOz1-/exec';
+  /* ?∏Â?‰øÆÊ≠£ÔºöÂæπÂ∫ïÂ???Chrome ??Font Boosting (?ôÊòØ?úÈ?‰∏ÄÁßíÂ??°‰??Ñ‰∏ª?? */
+  html,
+  body {
+    -webkit-text-size-adjust: none !important;
+    text-size-adjust: none !important;
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+  }
 
-        // Mock google.script.run for compatibility
-        window.google = window.google || {};
-        window.google.script = window.google.script || {};
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    color: var(--text-color);
+    font-size: 15px;
+    /* ÁßªÈô§‰πãÂ??Ä?âÊ?Â¢ûÂ? Chrome Ë≤†Ê??ÑÂ??´Ë??ãÂã¢?êÂà∂ */
+  }
 
-        window.google.script.run = {
-            withSuccessHandler: function (callback) {
-                return new Proxy({}, {
-                    get: function (target, prop) {
-                        return function (...args) {
-                            console.log(`[Adapter] Call: ${prop}`, args);
-                            if (prop === 'getFullSystemSync') {
-                                // Real network call
-                                fetch(`${GAS_API_URL}?api=true`)
-                                    .then(res => res.json())
-                                    .then(data => {
-                                        console.log('[Adapter] Data Received', data);
-                                        callback(data);
-                                    })
-                                    .catch(err => {
-                                        console.error('[Adapter] Error', err);
-                                        if (window.google.script.run.failureHandler) window.google.script.run.failureHandler(err);
-                                    });
-                            } else {
-                                console.warn(`[Adapter] Function ${prop} should be handled locally.`);
-                                // If some function slips through local cache, we ignore it here 
-                                // because we rewritten fetchWithCache to handle everything locally.
-                            }
-                        }
-                    }
-                });
-            },
-            withFailureHandler: function (callback) {
-                this.failureHandler = callback;
-                return this;
-            }
-        };
+  .container {
+    max-width: 1000px;
+    margin: 10px auto;
+    padding: 12px 25px;
+    background-color: var(--surface-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  }
 
-        window.google.script.history = {
-            push: function (s, p, page) {
-                const url = new URL(window.location);
-                url.searchParams.set('page', page);
-                if (p) Object.keys(p).forEach(k => url.searchParams.set(k, p[k]));
-                window.history.pushState(s, '', url);
-            },
-            setChangeHandler: function (cb) {
-                window.addEventListener('popstate', () => {
-                    const params = {};
-                    new URL(window.location).searchParams.forEach((val, key) => params[key] = val);
-                    cb({ location: { parameter: params } });
-                });
-            }
-        };
-    </script>
+  .global-nav {
+    min-height: 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+  }
 
-    <!-- Styles Merged -->
+  .nav-links {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .nav-links a {
+    text-decoration: none;
+    color: var(--primary-color);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .nav-links span {
+    color: #ddd;
+  }
+
+  h1 {
+    color: var(--secondary-color);
+    font-size: 1.5em;
+    font-weight: 700;
+    margin-bottom: 10px;
+    margin-top: 0;
+  }
+
+  .nav-btn {
+    background-color: var(--surface-color);
+    color: var(--primary-color);
+    border: 1.5px solid var(--primary-color);
+    padding: 5px 15px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 1.05em;
+    font-weight: 500;
+  }
+
+  .nav-btn.active,
+  .nav-btn:hover {
+    background-color: var(--primary-color);
+    color: white;
+  }
+
+  .search-box {
+    display: flex;
+    align-items: center;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    padding: 2px 12px;
+    background: white;
+  }
+
+  .search-input {
+    border: none;
+    outline: none;
+    padding: 5px 0;
+    width: 110px;
+    font-size: 0.9em;
+  }
+
+  .staff-count-label {
+    font-size: 0.95em;
+    color: var(--secondary-color);
+    background-color: #f8f9fa;
+    padding: 4px 15px;
+    border-radius: 15px;
+    border: 1px solid #ddd;
+    font-weight: 500;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: center;
+  }
+
+  th,
+  td {
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    text-align: center !important;
+  }
+
+  th {
+    background-color: var(--secondary-color) !important;
+    color: #ffffff !important;
+    font-weight: 500;
+  }
+
+  tr:nth-child(even) {
+    background-color: #f9fbfd;
+  }
+
+  .timetable-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .timetable-table {
+    width: 720px;
+    margin: 0 auto;
+    table-layout: fixed;
+    border: 2px solid #2c3e50;
+  }
+
+  .timetable-table th {
+    background: var(--tt-header-bg) !important;
+    color: #000 !important;
+    font-weight: 700;
+    height: 38px;
+    border: 1.5px solid #2c3e50;
+  }
+
+  .timetable-table td {
+    height: 52px;
+    padding: 2px !important;
+    border: 1px solid #999999;
+  }
+
+  .period-label {
+    background-color: #ebf2f6 !important;
+    font-weight: bold;
+    width: 70px;
+    color: #2c3e50 !important;
+    border-right: 2px solid #2c3e50 !important;
+  }
+
+  .subject-name {
+    font-weight: 700;
+    color: #000;
+    font-size: 1.1em;
+    line-height: 1.2;
+    display: block;
+  }
+
+  .link-text {
+    color: var(--accent-color);
+    text-decoration: none;
+    font-size: 0.85em;
+    font-weight: 500;
+    display: block;
+    cursor: pointer;
+  }
+
+  .print-btn {
+    background: #34495e;
+    color: white;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+  }
+
+  .toast-msg {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(44, 62, 80, 0.9);
+    color: white;
+    padding: 12px 25px;
+    border-radius: 30px;
+    z-index: 9999;
+    display: none;
+    font-weight: bold;
+  }
+
+  .site-footer {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    padding: 15px 0;
+    width: 100%;
+    margin-top: auto;
+    line-height: 1.6;
+  }
+
+  @media print {
+
+    .global-nav,
+    .print-btn,
+    .nav-btn,
+    .search-box,
+    .staff-count-label,
+    .toast-msg,
+    .no-print {
+      display: none !important;
+    }
+
+    .container {
+      box-shadow: none !important;
+      border: none !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    .timetable-table {
+      width: 95% !important;
+      border: 1.5px solid black !important;
+    }
+
+    th,
+    td {
+      border: 1px solid black !important;
+      color: black !important;
+    }
+  }
+</style>
+<div id="toast" class="toast-msg"></div>
+<script>
+  function showToast(msg) {
+    const toast = document.getElementById('toast'); toast.textContent = msg; toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 3000);
+  }
+
+  let clientIP = "";
+  async function getUserIP() {
+    if (clientIP) return clientIP;
+    try {
+      const res = await fetch('https://api.ipify.org?format=json');
+      const data = await res.json();
+      clientIP = data.ip;
+      return clientIP;
+    } catch (e) { return ""; }
+  }
+
+  function getDisplayName(t, settings, isInternalEmail) {
+    if (!t) return "";
+    const mode = settings ? (settings.mode || 'OFF') : 'OFF';
+    const name = t.name || t.teacher || "";
+    let maskedName = t.maskedName || t.maskedTeacher || "";
+    if (!maskedName && name) maskedName = (name.length > 0) ? name[0] + '?ÅÂ∏´' : name;
+    if (mode === 'ALL') return maskedName;
+    if (mode === 'OFF') return name;
+    if (isInternalEmail) return name;
+    if (clientIP && settings.allowedIp && clientIP.startsWith(settings.allowedIp)) return name;
+    return maskedName;
+  }
+
+  const FECache = {
+    TTL: 3600 * 1000 * 6,
+    set: function (key, data) {
+      const cacheObj = { timestamp: new Date().getTime(), data: data };
+      localStorage.setItem('FSJH_FE_' + key, JSON.stringify(cacheObj));
+    },
+    get: function (key) {
+      const raw = localStorage.getItem('FSJH_FE_' + key);
+      if (!raw) return null;
+      try {
+        const cacheObj = JSON.parse(raw);
+        const now = new Date().getTime();
+        if (now - cacheObj.timestamp > this.TTL) cacheObj.stale = true;
+        return cacheObj;
+      } catch (e) { return null; }
+    },
+    getDB: function () {
+      const sync = this.get('FULL_SYNC');
+      return sync ? sync.data : null;
+    },
+    clear: function () {
+      Object.keys(localStorage).forEach(key => { if (key.startsWith('FSJH_FE_')) localStorage.removeItem(key); });
+    }
+  };
+
+  function fetchWithCache(funcName, args, callback, cacheKey) {
+    const db = FECache.getDB();
+    if (db) {
+      let localResult = null;
+      if (funcName === 'getTeacherData') {
+        const scheduledTeachers = new Set(db.schedules.map(r => r.tname));
+        localResult = { success: true, teachers: db.teachers.map(t => ({ ...t, hasSchedule: scheduledTeachers.has(t.name) })), settings: db.settings, isInternalEmail: db.isInternalEmail };
+      } else if (funcName === 'getClassList') {
+        const classStats = new Map();
+        db.schedules.forEach(row => {
+          if (!classStats.has(row.classCode)) classStats.set(row.classCode, { count: 0, hasCore: false, name: row.className });
+          const stat = classStats.get(row.classCode);
+          stat.count++;
+          if (parseInt(row.period) >= 1 && parseInt(row.period) <= 7) stat.hasCore = true;
+        });
+        localResult = { success: true, classes: Array.from(classStats.entries()).filter(([code, stat]) => stat.count > 3 && stat.hasCore).map(([code, stat]) => ({ code, name: stat.name })).sort((a, b) => a.code.localeCompare(b.code)) };
+      } else if (funcName === 'getTeacherTimetable') {
+        const id = args[0]; const rows = db.schedules.filter(row => row.tid === id);
+        const timetable = {}; let realName = "";
+        rows.forEach(row => {
+          if (!timetable[row.day]) timetable[row.day] = {}; if (!realName) realName = row.tname;
+          timetable[row.day][row.period] = { subjectName: row.subjectName, subjectCode: row.subjectCode, className: row.className, classCode: row.classCode };
+        });
+        const masked = (rows.length > 0) ? (rows[0].maskedTeacher || rows[0].tname) : "";
+        localResult = { success: true, timetable, teacherName: realName, maskedName: masked, settings: db.settings, isInternalEmail: db.isInternalEmail };
+      } else if (funcName === 'getClassTimetable') {
+        const classCode = args[0]; const classRows = db.schedules.filter(row => row.classCode === classCode);
+        const timetable = {};
+        classRows.forEach(row => {
+          if (!timetable[row.day]) timetable[row.day] = {};
+          timetable[row.day][row.period] = { subjectName: row.subjectName, teacher: row.tname, maskedTeacher: row.maskedTeacher || row.tname, teacherId: row.tid };
+        });
+        localResult = { success: true, timetable, className: classRows.length > 0 ? classRows[0].className : classCode, settings: db.settings, isInternalEmail: db.isInternalEmail };
+      }
+      if (localResult) { callback(localResult, true); return; }
+    }
+    const cached = FECache.get(cacheKey);
+    if (cached) callback(cached.data, true);
+    google.script.run.withSuccessHandler(res => {
+      if (res && res.success) { FECache.set(cacheKey, res); callback(res, false); }
+    })[funcName].apply(null, args);
+  }
+</script>
     <style>
-        :root {
-            --primary-color: #2980b9;
-            --secondary-color: #2c3e50;
-            --accent-color: #3498db;
-            --bg-color: #f0f3f5;
-            --surface-color: #ffffff;
-            --text-color: #3c4043;
-            --subtle-gray: #dcdde1;
-            --tt-header-bg: #dfe6e9;
-
-            /* v6.1 Theme */
-            --brand-primary: #2563eb;
-            --brand-dark: #0f172a;
-            --brand-light: #eff6ff;
-            --glass-bg: rgba(255, 255, 255, 0.88);
-            --glass-border: rgba(255, 255, 255, 0.5);
-        }
-
-        html,
+        /* ?®Â??çÁΩÆ?áÂü∫Á§éË®≠ÂÆ?*/
         body {
-            -webkit-text-size-adjust: none !important;
-            text-size-adjust: none !important;
             margin: 0;
             padding: 0;
             background-color: #f8fafc;
-            font-family: 'Plus Jakarta Sans', 'Noto Sans TC', sans-serif;
-            min-height: 100vh;
             display: flex;
             flex-direction: column;
+            min-height: 100vh;
+            font-family: 'Plus Jakarta Sans', 'Noto Sans TC', sans-serif;
         }
 
-        /* Layout & Components */
         .page-view {
             display: none;
             width: 100%;
@@ -124,12 +494,13 @@
         }
 
         .global-nav {
+            font-size: 1.05em;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
+            margin-bottom: 8px;
             border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 8px;
         }
 
         .nav-links {
@@ -155,30 +526,62 @@
             font-weight: bold;
         }
 
-        /* Home Styles */
+        /* È¢®Ê†º v6.1 - ?çË™ø?ªÁ??¨Ê? */
+        :root {
+            --brand-primary: #2563eb;
+            --brand-dark: #0f172a;
+            --brand-light: #eff6ff;
+            --glass-bg: rgba(255, 255, 255, 0.88);
+            --glass-border: rgba(255, 255, 255, 0.5);
+        }
+
         .home-hero {
             height: 320px;
-            background: linear-gradient(135deg, #1e40af, #0f172a);
+            background: linear-gradient(135deg, #1e40af, #0f172a),
+                url('https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&q=80&w=2000');
+            background-size: cover;
+            background-position: center;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             color: #fff;
             text-align: center;
-            margin-bottom: 40px;
+            position: relative;
             clip-path: ellipse(150% 100% at 50% 0%);
         }
 
+        .mesh-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.4) 0, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(147, 197, 253, 0.3) 0, transparent 50%);
+            pointer-events: none;
+        }
+
         .home-title {
+            z-index: 10;
             font-size: 2.8rem;
             font-weight: 800;
             margin: 0;
+            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            letter-spacing: -0.5px;
+            color: white !important;
         }
 
         .home-subtitle {
+            z-index: 10;
             margin-top: 10px;
+            margin-bottom: 3rem;
             font-size: 1.15rem;
             opacity: 0.85;
+            font-weight: 300;
+            letter-spacing: 1px;
+            color: white;
         }
 
         .home-grid {
@@ -188,65 +591,205 @@
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 25px;
             padding: 0 20px;
+            z-index: 20;
+            position: relative;
         }
 
         .feature-card {
-            background: rgba(255, 255, 255, 0.9);
+            background: var(--glass-bg);
             backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
             border-radius: 28px;
             padding: 35px 25px;
             text-align: center;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             cursor: pointer;
-            transition: transform 0.3s;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .feature-card:hover {
             transform: translateY(-8px);
+            background: #ffffff;
+            border-color: var(--brand-primary);
+            box-shadow: 0 25px 50px rgba(37, 99, 235, 0.12);
         }
 
         .card-icon {
             width: 70px;
             height: 70px;
-            background: #eff6ff;
-            color: #2563eb;
+            background: var(--brand-light);
+            color: var(--brand-primary);
             border-radius: 18px;
-            margin: 0 auto 20px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 2rem;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover .card-icon {
+            background: var(--brand-primary);
+            color: #fff;
+            transform: scale(1.1);
         }
 
         .card-title {
             font-size: 1.5rem;
-            color: #0f172a;
-            margin-bottom: 10px;
+            color: var(--brand-dark);
+            margin: 0 0 10px;
             font-weight: 700;
         }
 
         .card-desc {
             color: #64748b;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 5px;
         }
 
-        /* Buttons & Inputs */
-        .nav-btn {
-            background: #fff;
-            color: #3b82f6;
-            border: 1.5px solid #3b82f6;
-            padding: 4px 10px;
-            border-radius: 20px;
+        /* --- Ë©≥Ê??ÅÔ?‰∏âÊ?‰ΩàÂ??ñÂ? --- */
+        .detail-wrapper {
+            display: flex;
+            flex-direction: row;
+            align-items: stretch;
+            height: calc(100vh - 60px);
+            gap: 12px;
+            overflow: hidden;
+            margin: 5px auto;
+            max-width: 1200px;
+            background: #f0f3f5;
+        }
+
+        .col-cats {
+            width: 104px;
+            flex-shrink: 0;
+            background: #0f172a;
+            color: #f1f5f9;
+            border-radius: 12px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            padding: 3px 0;
+        }
+
+        .cat-group {
+            padding: 4px 10px 1px;
+            font-size: 0.72em;
+            color: #64748b;
+            font-weight: bold;
+        }
+
+        .cat-btn {
+            padding: 4.5px 15px;
             cursor: pointer;
-            font-size: 0.95em;
-            white-space: nowrap;
+            font-size: 1.05em;
+            border-left: 4px solid transparent;
+            transition: all 0.2s;
         }
 
-        .nav-btn.active,
-        .nav-btn:hover {
-            background: #3b82f6;
+        .cat-btn:hover {
+            background: #1e293b;
+        }
+
+        .cat-btn.active {
+            background: #1e293b;
+            border-left-color: #3b82f6;
             color: white;
+            font-weight: bold;
         }
 
+        .col-list {
+            width: 208px;
+            flex-shrink: 0;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        }
+
+        .list-search-box {
+            padding: 8px;
+            border-bottom: 1px solid #f1f5f9;
+            text-align: center;
+        }
+
+        .list-search-input {
+            width: 85%;
+            padding: 5px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.85em;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .list-search-input:focus {
+            border-color: #3b82f6;
+        }
+
+        .list-scroll-area {
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        .list-item {
+            padding: 1px 10px;
+            border-bottom: 1px solid #f8fafc;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 24px;
+            transition: background 0.1s;
+        }
+
+        .list-item:hover {
+            background: #f1f5f9;
+        }
+
+        .list-item.active {
+            background: #cfe2ff;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .t-name-row {
+            font-weight: bold;
+            color: #1e293b;
+            font-size: 1.02em;
+        }
+
+        .t-tag {
+            background: #f1f5f9;
+            padding: 0px 4px;
+            border-radius: 4px;
+            color: #64748b;
+            font-size: 0.72em;
+        }
+
+        .t-tag.blue {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .col-main {
+            flex-grow: 1;
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            overflow-y: auto;
+            padding: 5px 15px 10px 15px;
+            position: relative;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        }
+
+        /* --- ?ôÂ∏´?óË°®?ÅÂ?‰ª∂Á?ÊπäÂ? --- */
         .nav-rows-container {
             display: flex;
             flex-direction: column;
@@ -256,9 +799,36 @@
 
         .nav-row {
             display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
             gap: 4px;
+            align-items: center;
+            width: 100%;
             overflow-x: auto;
-            padding-bottom: 2px;
+        }
+
+        .nav-row::-webkit-scrollbar {
+            height: 0;
+            background: transparent;
+        }
+
+        .nav-btn {
+            background-color: #fff;
+            color: #3b82f6;
+            border: 1.5px solid #3b82f6;
+            padding: 4px 10px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 500;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .nav-btn.active,
+        .nav-btn:hover {
+            background-color: #3b82f6;
+            color: white;
         }
 
         .teacher-search-box {
@@ -269,833 +839,942 @@
             padding: 0 10px;
             background: white;
             height: 32px;
+            width: 170px;
+            flex-shrink: 0;
         }
 
         .teacher-search-input {
             border: none;
             outline: none;
-            margin-left: 6px;
-            font-size: 0.9em;
-            width: 120px;
-        }
-
-        /* Table Styles */
-        .teacher-table {
+            padding: 0;
             width: 100%;
-            border-collapse: collapse;
-            text-align: left;
+            font-size: 0.95em;
+            margin-left: 6px;
         }
 
-        .teacher-table th {
-            background: #f1f5f9;
-            padding: 10px;
+        .staff-count-label {
+            font-size: 0.9em;
             color: #475569;
+            background-color: #f1f5f9;
+            padding: 0 12px;
+            border-radius: 15px;
+            border: 1px solid #e2e8f0;
+            font-weight: 500;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-left: 0;
         }
 
-        .teacher-table td {
-            border-bottom: 1px solid #f1f5f9;
-            padding: 10px;
-            color: #1e293b;
-        }
-
-        .teacher-table tr:hover {
-            background: #f8fafc;
-        }
-
-        /* Timetable */
+        /* --- Ë™≤Ë°®Ê®??ÔºöÈ?Â∫¶Á?Â∞çÁµ±‰∏Ä (v5.9.8) --- */
         .timetable-table {
             width: 100%;
-            max-width: 800px;
+            max-width: 850px;
             margin: 0 auto;
-            border-collapse: collapse;
-            border: 2px solid #0f172a;
             table-layout: fixed;
+            border: 2px solid #0f172a;
+            border-collapse: collapse;
         }
 
         .timetable-table th {
             background: #f1f5f9;
-            border: 1px solid #0f172a;
-            height: 40px;
+            color: #0f172a;
+            font-weight: 700;
+            height: 34px;
+            border: 1.5px solid #0f172a;
         }
 
         .timetable-table td {
+            height: 49px;
+            padding: 0;
             border: 1px solid #cbd5e1;
-            height: 50px;
             text-align: center;
             vertical-align: middle;
-            padding: 2px;
+            overflow: hidden;
         }
 
         .period-label {
-            background: #ebf2f6;
-            width: 60px;
+            background-color: #ebf2f6;
             font-weight: bold;
+            width: 60px !important;
+            color: #2c3e50;
         }
 
         .subject-name {
             font-weight: 700;
-            display: block;
+            color: #000;
             font-size: 1.1em;
+            line-height: 1.1;
+            display: block;
+            margin-bottom: 1px;
         }
 
         .link-text {
             color: #3b82f6;
-            font-size: 0.9em;
-            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.95em;
+            font-weight: 500;
             display: block;
-        }
-
-        .timetable-table-wrap {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        /* Detail Layout */
-        .detail-wrapper {
-            display: flex;
-            gap: 12px;
-            margin: 10px auto;
-            max-width: 1200px;
-        }
-
-        .col-cats {
-            width: 104px;
-            flex-shrink: 0;
-            background: #0f172a;
-            color: #f1f5f9;
-            border-radius: 12px;
-            padding: 10px 0;
-        }
-
-        .cat-btn {
-            padding: 8px 15px;
+            line-height: 1.1;
             cursor: pointer;
-            font-size: 1.05em;
-            border-left: 4px solid transparent;
         }
 
-        .cat-btn.active {
-            background: #1e293b;
-            border-left-color: #3b82f6;
-            font-weight: bold;
-        }
-
-        .cat-group {
-            padding: 5px 15px;
-            font-size: 0.75em;
-            color: #64748b;
-            font-weight: bold;
-            margin-top: 5px;
-        }
-
-        .col-list {
-            width: 220px;
+        /* --- ?≠Á??∏È? --- */
+        .col-class-nav {
+            width: 250px;
             flex-shrink: 0;
             background: #fff;
-            border-radius: 12px;
             border: 1px solid #e2e8f0;
+            border-radius: 12px;
             display: flex;
             flex-direction: column;
-            height: calc(100vh - 100px);
-        }
-
-        .list-search-box {
-            padding: 10px;
-            border-bottom: 1px solid #f1f5f9;
-        }
-
-        .list-search-input {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            box-sizing: border-box;
-        }
-
-        .list-scroll-area {
-            overflow-y: auto;
-            flex-grow: 1;
-        }
-
-        .list-item {
-            padding: 8px 15px;
-            cursor: pointer;
-            border-bottom: 1px solid #f8fafc;
-        }
-
-        .list-item:hover {
-            background: #f1f5f9;
-        }
-
-        .list-item.active {
-            background: #eff6ff;
-            border-left: 3px solid #3b82f6;
-        }
-
-        .col-main {
-            flex-grow: 1;
-            background: #fff;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
-            padding: 20px;
-            overflow-y: auto;
-        }
-
-        /* Class Grid */
-        .class-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-            gap: 8px;
-        }
-
-        .class-btn {
-            border: 1px solid #e2e8f0;
-            padding: 8px;
-            border-radius: 6px;
-            text-align: center;
-            cursor: pointer;
-            background: #f0f9ff;
-            color: #0369a1;
-            font-weight: 500;
-        }
-
-        .class-btn.active {
-            background: #0369a1;
-            color: white;
-        }
-
-        .grade-section {
-            margin-bottom: 15px;
-            padding: 10px;
-            background: #fff;
-            border-radius: 8px;
-            border: 1px solid #f1f5f9;
-        }
-
-        .grade-title {
-            font-weight: bold;
-            margin-bottom: 8px;
-            border-left: 4px solid #3b82f6;
-            padding-left: 8px;
-        }
-
-        .col-class-nav {
-            width: 200px;
-            flex-shrink: 0;
-            background: white;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
-            height: calc(100vh - 100px);
-            overflow-y: auto;
+            overflow: hidden;
         }
 
         .class-tabs {
             display: flex;
             border-bottom: 1px solid #e2e8f0;
+            background: #f1f5f9;
+            flex-shrink: 0;
         }
 
         .class-tab {
             flex: 1;
             text-align: center;
-            padding: 10px;
+            padding: 10px 0;
             cursor: pointer;
-            background: #f8fafc;
+            font-size: 0.92em;
+            color: #64748b;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .class-tab:hover {
+            background: #e2e8f0;
+            color: #1e40af;
         }
 
         .class-tab.active {
-            background: white;
-            border-bottom: 2px solid #3b82f6;
-            font-weight: bold;
+            color: #1e40af;
+            border-bottom-color: #3b82f6;
+            background: #fff;
+            font-weight: 800;
+        }
+
+        .class-columns-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 8px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .class-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
         }
 
         .class-btn-mini {
-            padding: 6px;
-            margin: 4px;
             text-align: center;
+            border-radius: 6px;
             cursor: pointer;
-            border-radius: 4px;
-        }
-
-        .class-btn-mini:hover {
-            background: #f1f5f9;
-        }
-
-        .class-btn-mini.active {
-            bg: #eff6ff;
-            color: #2563eb;
-            font-weight: bold;
-        }
-
-        /* Loader */
-        #app-loader {
-            position: fixed;
-            inset: 0;
-            background: #0f172a;
-            z-index: 9999;
+            border: 1px solid #f1f5f9;
+            transition: all 0.1s;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
+            padding: 4px 0;
+            font-size: 0.85em;
+            min-height: 30px;
+        }
+
+        .class-btn-mini.digits-3 {
+            font-size: 1.0em;
+            font-weight: 700;
+        }
+
+        .class-btn {
+            text-align: center;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 1px solid #f1f5f9;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 0;
+            font-size: 0.9em;
+            min-height: 28px;
+            text-decoration: none;
+        }
+
+        .class-btn.digits-3 {
+            font-size: 1.0em;
+            font-weight: 700;
+        }
+
+        .standard {
+            background-color: #f0f9ff;
+            border-color: #bae6fd;
+            color: #0369a1;
+        }
+
+        .standard:hover {
+            background-color: #e0f2fe;
+            border-color: #0369a1;
+        }
+
+        .standard.active {
+            background-color: #0369a1 !important;
+            color: white !important;
+        }
+
+        .special {
+            border-color: #fcd34d;
+            background: #fffbeb;
+            color: #b45309;
+        }
+
+        .special:hover {
+            background: #fef3c7;
+        }
+
+        .special.active {
+            background: #b45309 !important;
+            color: white !important;
+        }
+
+        .grade-section {
+            margin-bottom: 5px;
+            padding: 5px 12px;
+            background-color: #fcfcfc;
+            border: 1px solid #f1f5f9;
+            border-radius: 8px;
+        }
+
+        .grade-title {
+            font-size: 1em;
+            margin-bottom: 4px;
+            border-left: 4px solid #3b82f6;
+            padding-left: 8px;
+            font-weight: bold;
+            color: #1e293b;
+        }
+
+        .class-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 6px;
+        }
+
+        .print-btn {
+            background: #0f172a;
             color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+
+
+
+        .sync-badge {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(15, 23, 42, 0.9);
+            color: white;
+            padding: 6px 18px;
+            border-radius: 30px;
+            font-size: 0.8em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+            opacity: 0.3;
             transition: opacity 0.5s;
         }
 
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #334155;
-            border-top-color: #3b82f6;
+        .sync-dot {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
         }
 
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        /* Media Queries */
-        @media (max-width: 768px) {
-            .detail-wrapper {
-                flex-direction: column;
-            }
-
-            .col-cats,
-            .col-list,
-            .col-class-nav {
-                width: 100%;
-                height: auto;
-                max-height: 180px;
-            }
-
-            .col-main {
-                padding: 10px;
-            }
-
-            .timetable-table th,
-            .timetable-table td {
-                padding: 2px;
-                font-size: 0.85em;
-            }
-
-            .container {
-                padding: 10px;
-            }
+        .sync-dot.updating {
+            background: #f59e0b;
+            animation: blink 1s infinite;
         }
 
         @media print {
+            @page {
+                margin: 0.5cm;
+                size: portrait;
+            }
 
+            html,
+            body {
+                height: auto !important;
+                overflow: visible !important;
+                background: white !important;
+            }
+
+            #sync-status,
+            .site-footer,
             .global-nav,
             .col-cats,
             .col-list,
             .col-class-nav,
             .print-btn,
+            .mobile-fab,
+            .list-search-box,
+            .nav-container,
             .home-hero {
                 display: none !important;
             }
 
-            .col-main,
-            .container {
-                width: 100% !important;
-                border: none !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                box-shadow: none !important;
-            }
-
             .detail-wrapper {
                 display: block !important;
+                height: auto !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                max-width: none !important;
+            }
+
+            .col-main {
+                display: block !important;
+                width: 90% !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                margin: 0 auto !important;
+                overflow: visible !important;
+            }
+
+            .container {
+                max-width: none !important;
+                width: 90% !important;
+                box-shadow: none !important;
+                border: none !important;
+                padding: 0 !important;
+                margin: 0 auto !important;
+            }
+
+            .timetable-table {
+                width: 100% !important;
+                border: 2px solid #000 !important;
+                border-collapse: collapse !important;
+            }
+
+            .timetable-table th,
+            .timetable-table td {
+                border: 1px solid #000 !important;
+                color: #000 !important;
+            }
+
+            #teacher-detail-title,
+            #class-detail-title {
+                font-size: 2em !important;
+                margin: 0 0 15px 0 !important;
+                color: #000 !important;
+            }
+        }
+
+        /* --- ËΩâÂ†¥?∏Â??ïÁï´ (Ripple Transition) --- */
+        #transition-loader {
+            position: fixed;
+            inset: 0;
+            background: #1e40af;
+            /* ?áÁ?È¶ñÈ? Hero ?åËâ≤Á≥?*/
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            clip-path: circle(0% at 50% 50%);
+            transition: clip-path 0.25s cubic-bezier(0.77, 0, 0.175, 1);
+        }
+
+        #transition-loader.active {
+            clip-path: circle(150% at 50% 50%);
+            pointer-events: auto;
+        }
+
+        .dot-pulse {
+            display: flex;
+            gap: 12px;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.4s 0.3s;
+        }
+
+        #transition-loader.active .dot-pulse {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .pulse-dot {
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            animation: dotLoader 0.6s infinite alternate;
+        }
+
+        .pulse-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .pulse-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes dotLoader {
+            to {
+                transform: translateY(-20px);
+                opacity: 0.5;
             }
         }
     </style>
 </head>
 
 <body>
-    <!-- Loading Screen -->
-    <div id="app-loader">
-        <div class="spinner"></div>
-        <div style="margin-top:20px; font-weight:bold;">Á≥ªÁµ±ËºâÂÖ•‰∏≠...</div>
-        <div style="font-size:0.8em; color:#94a3b8; margin-top:5px;">Ê≠£Âú®ÂêåÊ≠•ÊúÄÊñ∞Ë™≤Ë°®Ë≥áÊñô</div>
+    <!-- ËΩâÂ†¥?ïÁï´Â±?-->
+    <div id="transition-loader">
+        <div class="dot-pulse">
+            <div class="pulse-dot"></div>
+            <div class="pulse-dot"></div>
+            <div class="pulse-dot"></div>
+        </div>
     </div>
 
-    <!-- App Container -->
+    <!-- ?®Â? Loading ?ÆÁΩ© -->
+    <div id="app-loader"
+        style="position:fixed; top:0; left:0; width:100%; height:100%; background:#0f172a; z-index:9999; display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; transition: opacity 0.5s;">
+        <div class="mini-spinner"
+            style="width:50px; height:50px; border-width:4px; border-top-color:#3b82f6; margin-bottom:20px;"></div>
+        <div style="font-size:1.5em; font-weight:bold; letter-spacing:2px;">Á≥ªÁµ±ËºâÂÖ•‰∏?..</div>
+        <div style="margin-top: 20px; font-size: 11px; color: #aaa;">System Version: v6.3.2</div>
+        <div style="margin-top:10px; color:#94a3b8; font-size:0.9em;">Ê≠?ú®?åÊ≠•?Ä?∞Ë™≤Ë°®Ë???/div>
+    </div>
+
     <div id="app">
-        <!-- Index Page -->
-        <div id="page-index" class="page-view active">
-            <div class="home-hero">
-                <h1 class="home-title" id="home-school-name">Ë™≤Ë°®Êü•Ë©¢Á≥ªÁµ±</h1>
-                <div class="home-subtitle">Êô∫ÊÖß„ÄÅÂç≥ÊôÇ„ÄÅÁ≤æÊ∫ñÁöÑÊ†°ÂúíË™≤ÂãôÊ†∏ÂøÉÂπ≥Âè∞</div>
-            </div>
-            <div class="home-grid">
-                <div class="feature-card" onclick="router.navigate('teachers')">
-                    <div class="card-icon"><i class="fa-solid fa-chalkboard-user"></i></div>
-                    <div class="card-title">ÊïôÂ∏´ÂàóË°®</div>
-                    <div class="card-desc">ÂÖ®Ê†°ÊïôÂ∏´Ë™≤Ë°®Êü•Ë©¢</div>
-                </div>
-                <div class="feature-card" onclick="router.navigate('classes')">
-                    <div class="card-icon"><i class="fa-solid fa-users"></i></div>
-                    <div class="card-title">Áè≠Á¥öÂàóË°®</div>
-                    <div class="card-desc">ÂêÑÂπ¥Á¥öÁè≠Á¥öË™≤Ë°®Êü•Ë©¢</div>
-                </div>
-            </div>
-            <div style="text-align:center; padding: 20px; color:#94a3b8; font-size:0.8em;">
-                Powered by GitHub Pages & Google Apps Script
-            </div>
-        </div>
+        <section id="page-index" class="page-view"></section>
+        <section id="page-teachers" class="page-view"></section>
+        <section id="page-classes" class="page-view"></section>
+        <section id="page-teacher-detail" class="page-view"></section>
+        <section id="page-class-detail" class="page-view"></section>
+    </div>
 
-        <!-- Teachers List -->
-        <div id="page-teachers" class="page-view">
-            <div class="container">
-                <div class="global-nav">
-                    <div class="nav-links">
-                        <a onclick="router.navigate('index')">üè† È¶ñÈ†Å</a>
-                        <span>/</span>
-                        <span class="current">ÊïôÂ∏´ÂàóË°®</span>
-                    </div>
-                </div>
-                <div class="nav-rows-container">
-                    <div class="nav-row">
-                        <button class="nav-btn active" onclick="filterTeacherList('all', '', this)">ÂÖ®Ê†°‰∫∫Âì°</button>
-                        <button class="nav-btn" onclick="filterTeacherList('unit', 'ÊïôÂãôËôï', this)">ÊïôÂãôËôï</button>
-                        <button class="nav-btn" onclick="filterTeacherList('unit', 'Â≠∏ÂãôËôï', this)">Â≠∏ÂãôËôï</button>
-                        <button class="nav-btn" onclick="filterTeacherList('unit', 'Á∏ΩÂãôËôï', this)">Á∏ΩÂãôËôï</button>
-                        <button class="nav-btn" onclick="filterTeacherList('unit', 'ËºîÂ∞éÂÆ§', this)">ËºîÂ∞éÂÆ§</button>
-                        <div class="teacher-search-box">üîç <input id="t-search" type="text" class="teacher-search-input"
-                                placeholder="ÂßìÂêç..." onkeyup="filterTeacherList(lastFilter.type, lastFilter.val)"></div>
-                    </div>
-                    <div class="nav-row">
-                        <button class="nav-btn" onclick="filterTeacherList('field', 'Ë™ûÊñá', this)">Ë™ûÊñá</button>
-                        <button class="nav-btn" onclick="filterTeacherList('field', 'Êï∏Â≠∏', this)">Êï∏Â≠∏</button>
-                        <button class="nav-btn" onclick="filterTeacherList('field', 'Ëá™ÁÑ∂', this)">Ëá™ÁÑ∂</button>
-                        <button class="nav-btn" onclick="filterTeacherList('field', 'Á§æÊúÉ', this)">Á§æÊúÉ</button>
-                        <button class="nav-btn" onclick="filterTeacherList('field', 'ËóùË°ìËàá‰∫∫Êñá', this)">ËóùÊñá</button>
-                        <button class="nav-btn" onclick="filterTeacherList('field', 'ÂÅ•È´î', this)">ÂÅ•È´î</button>
-                    </div>
-                </div>
-                <div id="teacher-list-area"></div>
-            </div>
-        </div>
+    <div id="sync-status" class="sync-badge">
+        <span class="sync-dot"></span> <span id="sync-text">Á≥ªÁµ±Ë≥áÊ?Â∑≤Â?Ê≠?/span>
+    </div>
 
-        <!-- Classes List -->
-        <div id="page-classes" class="page-view">
-            <div class="container">
-                <div class="global-nav">
-                    <div class="nav-links">
-                        <a onclick="router.navigate('index')">üè† È¶ñÈ†Å</a>
-                        <span>/</span>
-                        <span class="current">Áè≠Á¥öÂàóË°®</span>
-                    </div>
-                </div>
-                <div id="class-list-area"></div>
-            </div>
-        </div>
 
-        <!-- Teacher Detail -->
-        <div id="page-teacher-detail" class="page-view">
-            <div class="container" style="max-width:none; padding:10px; background:transparent; box-shadow:none;">
-                <div class="detail-wrapper">
-                    <div class="col-cats" id="t-detail-cats"></div>
-                    <div class="col-list">
-                        <div class="list-search-box"><input id="t-detail-search" type="text" class="list-search-input"
-                                placeholder="ÊêúÂ∞ã..." onkeyup="renderDetailTeacherList()"></div>
-                        <div id="t-detail-list" class="list-scroll-area"></div>
-                    </div>
-                    <div class="col-main">
-                        <div class="global-nav" style="margin-bottom:10px;">
-                            <div class="nav-links">
-                                <a onclick="router.navigate('index')">È¶ñÈ†Å</a><span>/</span><a
-                                    onclick="router.navigate('teachers')">ÊïôÂ∏´</a>
+
+    <script>
+        const initialSyncData = <?!= JSON.stringify(initialSync || null) ?>;
+        const initialPage = '<?= initialPage ?>';
+        const initialParams = <?!= JSON.stringify(initialParams || {}) ?>;
+        const baseUrl = "<?= ScriptApp.getService().getUrl() ?>";
+
+        // ?Ä?ãÁÆ°?ÜÁâ©‰ª?(?®Êñº?õÊì¨?ÜÈ??çÁπ™?ÇÊÅ¢Âæ©Á???
+        const pageStates = {
+            teachers: { search: '', filterType: 'all', filterVal: '' },
+            teacherDetail: { activeId: '', search: '', filterType: 'all', filterVal: '' },
+            classDetail: { currentGrade: '1' }
+        };
+
+        const router = {
+            currentPage: '',
+            init: function () {
+                google.script.history.setChangeHandler(e => this.load(e.location.parameter.page, e.location.parameter));
+                ensureData(() => {
+                    this.load(initialPage || 'index', initialParams);
+                });
+            },
+            navigate: function (page, params = {}) {
+                const loader = document.getElementById('transition-loader');
+                const isFromHome = this.currentPage === 'index';
+                const isTargetList = (page === 'teachers' || page === 'classes');
+
+                if (isFromHome && isTargetList) {
+                    loader.classList.add('active');
+                    setTimeout(() => {
+                        google.script.history.push(null, params, page);
+                        this.load(page, params);
+                        setTimeout(() => {
+                            loader.classList.remove('active');
+                        }, 150);
+                    }, 200);
+                } else {
+                    google.script.history.push(null, params, page);
+                    this.load(page, params);
+                }
+            },
+            load: function (page, params) {
+                page = page || 'index';
+                const wasInTeacherDetail = this.currentPage === 'teacher_detail';
+
+                // 1. ?∑Ê??äÈ??¢ÂÖßÂÆ?(?õÊì¨?ÜÈ??∏Â?)
+                if (this.currentPage && this.currentPage !== page) {
+                    this.destroyPage(this.currentPage);
+                }
+
+                // 2. ?áÊ? Active ?Ä??                document.querySelectorAll('.page-view').forEach(el => el.classList.remove('active'));
+                const pageId = page === 'class_detail' ? 'page-class-detail' : (page === 'teacher_detail' ? 'page-teacher-detail' : 'page-' + page);
+                const target = document.getElementById(pageId);
+                if (target) {
+                    target.classList.add('active');
+                    this.currentPage = page;
+                } else {
+                    document.getElementById('page-index').classList.add('active');
+                    this.currentPage = 'index';
+                }
+
+                // 3. Ê∏≤Ê??∞È???                this.renderPage(this.currentPage, params, wasInTeacherDetail);
+            },
+            destroyPage: function (page) {
+                const pageId = page === 'class_detail' ? 'page-class-detail' : (page === 'teacher_detail' ? 'page-teacher-detail' : 'page-' + page);
+                const container = document.getElementById(pageId);
+                if (!container) return;
+
+                // ?®Ê?Á©∫Â?Ôºå‰?Â≠òÁâπÂÆöÈ??¢Á??Ä??                if (page === 'teachers') {
+                    const searchInput = document.getElementById('main-list-search');
+                    const activeBtn = document.querySelector('#page-teachers .nav-btn.active');
+                    if (searchInput) pageStates.teachers.search = searchInput.value;
+                    if (activeBtn) {
+                        pageStates.teachers.filterType = activeBtn.dataset.type;
+                        pageStates.teachers.filterVal = activeBtn.dataset.val;
+                    }
+                } else if (page === 'teacher_detail') {
+                    const searchInput = document.getElementById('desktop-search');
+                    if (searchInput) pageStates.teacherDetail.search = searchInput.value;
+                    pageStates.teacherDetail.filterType = currentFilter.type;
+                    pageStates.teacherDetail.filterVal = currentFilter.val;
+                }
+
+                container.innerHTML = ''; // ÂæπÂ?Ê∏ÖÁ©∫ DOM ÁØÄÈª?            },
+            renderPage: function (page, params, wasInTeacherDetail) {
+                const container = document.getElementById(page === 'class_detail' ? 'page-class-detail' : (page === 'teacher_detail' ? 'page-teacher-detail' : 'page-' + page));
+                if (!container) return;
+
+                if (page === 'index') {
+                    container.innerHTML = `
+                        <div class="home-hero">
+                            <div class="mesh-overlay"></div>
+                            <h1 class="home-title">${(DB?.settings?.schoolName) || 'Ë™≤Ë°®?•Ë©¢Á≥ªÁµ±'}</h1>
+                            <div class="home-subtitle">?∫ÊÖß?ÅÂç≥?Ç„ÄÅÁ≤æÊ∫ñÁ??°Â?Ë™≤Â??∏Â?Âπ≥Âè∞</div>
+                        </div>
+                        <div class="home-grid">
+                            <div class="feature-card" onclick="router.navigate('teachers')">
+                                <div class="card-icon"><i class="fa-solid fa-chalkboard-user"></i></div>
+                                <div class="card-title">?ôÂ∏´?óË°®</div>
+                                <div class="card-desc">Âø´ÈÄüÊü•Ë©¢ÂÖ®?°Ê?Â∏´Ë™≤Ë°®„ÄÅË??øËÅ∑?ôË??ôÂ≠∏?òÂ??ÜÈ???/div>
                             </div>
-                            <div style="display:flex; gap:10px;">
-                                <a id="adj-link" target="_blank" class="nav-btn" style="text-decoration:none;">‚öôÔ∏è
-                                    Ë™ø‰ª£Ë™≤</a>
-                                <button class="print-btn" onclick="window.print()">üñ®Ô∏è ÂàóÂç∞</button>
+                            <div class="feature-card" onclick="router.navigate('classes')">
+                                <div class="card-icon"><i class="fa-solid fa-shapes"></i></div>
+                                <div class="card-title">?≠Á??óË°®</div>
+                                <div class="card-desc">‰æùÂπ¥Á¥öÁÄèË¶Ω?ÑÁè≠Á¥öË™≤Ë°®Ô??åÊè°?≠Á?Ë™≤Á??ïÊ???/div>
                             </div>
                         </div>
-                        <h2 id="t-detail-title" style="text-align:center; margin-bottom:15px;"></h2>
-                        <div id="t-detail-tt"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                        <div class="no-print site-footer" style="border-top: 1px solid #f1f5f9; padding-top: 20px;">
+                            ?í° ?¨Á≥ªÁµ±Áî± <b>?ãËë£?ÅÂ∏´</b> Ë®≠Ë?Á∂≠Ë≠∑ | <span
+                                onclick="window.top.location.href='${baseUrl}?page=admin'"
+                                style="cursor:help; color:#3b82f6;">Powered by <b>Vibe Coding</b> ??</span>
+                        </div>`;
+                } else if (page === 'teachers') {
+                    initTeacherList();
+                } else if (page === 'classes') {
+                    initClassList();
+                } else if (page === 'teacher_detail') {
+                    initTeacherDetail(params.id, wasInTeacherDetail);
+                } else if (page === 'class_detail') {
+                    initClassDetail(params.code);
+                }
+            }
+        };
 
-        <!-- Class Detail -->
-        <div id="page-class-detail" class="page-view">
-            <div class="container" style="max-width:none; padding:10px; background:transparent; box-shadow:none;">
+        let DB = null;
+        function ensureData(cb) {
+            if (DB) { cb(DB); return; }
+
+            try {
+                const cached = FECache.getDB();
+                if (cached && cached.teachers && cached.schedules) {
+                    DB = { teachers: cached.teachers, schedules: cached.schedules, settings: cached.settings, isInternalEmail: cached.isInternalEmail };
+                    hideLoader(); // ?àË??´Èù¢?∫‰?
+                    applySystemSettings(DB.settings);
+                    cb(DB);
+                    // ?åÊôØ?¥Êñ∞
+                    google.script.run.withSuccessHandler(res => {
+                        if (res && res.syncTime > (cached.timestamp || 0)) {
+                            DB = res; FECache.set('FULL_SYNC', res);
+                            updateSyncUI(true, new Date(res.syncTime));
+                            applySystemSettings(DB.settings);
+                        }
+                    }).getFullSystemSync();
+                } else {
+                    // ?°Âø´?ñÔ?Âº∑Ëø´ËºâÂÖ•
+                    google.script.run.withSuccessHandler(res => {
+                        if (res) {
+                            DB = res; FECache.set('FULL_SYNC', res);
+                            updateSyncUI(true, new Date(res.syncTime));
+                            applySystemSettings(DB.settings);
+                            hideLoader();
+                            cb(DB);
+                        } else {
+                            alert("Ë≥áÊ??åÊ≠•Â§±Ê?ÔºåË??çÊñ∞?¥Á??ÅÈù¢??);
+                        }
+                    }).withFailureHandler(err => {
+                        alert("Á∂≤Ë∑Ø?ØË™§: " + err.message);
+                    }).getFullSystemSync();
+                }
+            } catch (e) {
+                console.error("ensureData error:", e);
+                FECache.clear(); // ?¨‰?Âø´Â?ÊØÄ?çÂ??¥ÈåØË™§Ô?Ê∏ÖÈô§ÂÆ?                location.reload();
+            }
+        }
+
+        function hideLoader() {
+            const loader = document.getElementById('app-loader');
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => { loader.style.display = 'none'; }, 500);
+            }
+        }
+
+        function applySystemSettings(settings) {
+            if (!settings) return;
+            try {
+                const schoolName = settings.schoolName || '?¨Ê†°';
+                document.title = schoolName + ' Ë™≤Ë°®?•Ë©¢Á≥ªÁµ±';
+
+                // ?¥Êñ∞È¶ñÈ?Ê®ôÈ?
+                const heroTitle = document.querySelector('.home-title');
+                if (heroTitle) heroTitle.textContent = schoolName + ' Ë™≤Ë°®?•Ë©¢Á≥ªÁµ±';
+
+                // ?¥Êñ∞?ôÂ∏´?óË°®Ê®ôÈ?
+                const teacherTitle = document.querySelector('#page-teachers h1');
+                if (teacherTitle) {
+                    // ?ôË£°Ë¶ÅÁ?ÂæÆÊ∫´?î‰?ÈªûÔ?‰øùÁ? emoji
+                    teacherTitle.innerHTML = '???ç??' + schoolName + ' ?ôÂ∏´?óË°®';
+                }
+            } catch (e) { console.warn("applySettings minor error:", e); }
+        }
+
+        function updateSyncUI(isNew, time) {
+            const txt = document.getElementById('sync-text');
+            const badge = document.getElementById('sync-status');
+            if (txt) { txt.textContent = `Ë≥áÊ?Â∑≤Â?Ê≠?(v${time.getHours()}:${String(time.getMinutes()).padStart(2, '0')})`; setTimeout(() => { if (badge) badge.style.opacity = '0.3'; }, 5000); }
+        }
+
+        function initTeacherList() {
+            const container = document.getElementById('page-teachers');
+            container.innerHTML = `
+                <div class="container">
+                    <div class="global-nav">
+                        <div class="nav-links">
+                            <a onclick="router.navigate('index')">?? È¶ñÈ?</a>
+                            <span>|</span>
+                            <span class="current">?ë• ?ôÂ∏´?óË°®</span>
+                            <span>|</span>
+                            <a onclick="router.navigate('classes')">?? ?≠Á??óË°®</a>
+                        </div>
+                    </div>
+                    <h1 style="color:#0f172a; margin: 0 0 10px 0; font-size: 1.6em;">???ç??${(DB?.settings?.schoolName) || ''} ?ôÂ∏´?óË°®</h1>
+                    <div id="teacher-list-content">
+                        <div class="nav-rows-container">
+                            <div class="nav-row">
+                                <button class="nav-btn" data-type="all">?®Ê†°‰∫∫Âì°</button>
+                                <button class="nav-btn" data-type="unit" data-val="?ôÂ???>?ôÂ???/button>
+                                <button class="nav-btn" data-type="unit" data-val="Â≠∏Â???>Â≠∏Â???/button>
+                                <button class="nav-btn" data-type="unit" data-val="Á∏ΩÂ???>Á∏ΩÂ???/button>
+                                <button class="nav-btn" data-type="unit" data-val="ËºîÂ?ÂÆ?>ËºîÂ?ÂÆ?/button>
+                                <button class="nav-btn" data-type="unit" data-val="‰∏ÄÂπ¥Á?Â∞éÂ∏´">‰∏ÄÂπ¥Á?Â∞éÂ∏´</button>
+                                <button class="nav-btn" data-type="unit" data-val="‰∫åÂπ¥Á¥öÂ?Â∏?>‰∫åÂπ¥Á¥öÂ?Â∏?/button>
+                                <button class="nav-btn" data-type="unit" data-val="‰∏âÂπ¥Á¥öÂ?Â∏?>‰∏âÂπ¥Á¥öÂ?Â∏?/button>
+                                <div class="teacher-search-box">?? <input type="text" id="main-list-search" class="teacher-search-input" placeholder="ÂßìÂ??úÂ?..."></div>
+                            </div>
+                            <div class="nav-row">
+                                <button class="nav-btn" data-type="title" data-val="Â∞à‰ªª?ôÂ∏´">Â∞à‰ªª?ôÂ∏´</button>
+                                <button class="nav-btn" data-type="field" data-val="Ë™ûÊ?">Ë™ûÊ??òÂ?</button>
+                                <button class="nav-btn" data-type="field" data-val="?∏Â≠∏">?∏Â≠∏?òÂ?</button>
+                                <button class="nav-btn" data-type="field" data-val="?™ÁÑ∂">?™ÁÑ∂?òÂ?</button>
+                                <button class="nav-btn" data-type="field" data-val="Á§æÊ?">Á§æÊ??òÂ?</button>
+                                <button class="nav-btn" data-type="field" data-val="?ùË??á‰∫∫??>?ùÊ??òÂ?</button>
+                                <button class="nav-btn" data-type="field" data-val="?•È?">?•È??òÂ?</button>
+                                <button class="nav-btn" data-type="field" data-val="ÁßëÊ?">ÁßëÊ??òÂ?</button>
+                                <div class="staff-count-label">?ë• <span id="staff-count-label-txt">?®Ê†°‰∫∫Âì°</span>Ôº?span id="staff-count-num">0</span>‰∫?/div>
+                            </div>
+                        </div>
+                        <div id="main-list-table-area"></div>
+                    </div>
+                </div>`;
+
+            ensureData(db => {
+                const scheduled = new Set(db.schedules.map(s => s.tname));
+                const renderMainList = (type = 'all', val = '', search = '') => {
+                    const list = db.teachers.filter(t => {
+                        let m = (type === 'all') ? true : (type === 'field' ? (t.field || '').includes(val) : t[type] === val);
+                        return m && getDisplayName(t, db.settings, db.isInternalEmail).toLowerCase().includes(search.toLowerCase());
+                    }).sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.unit || '').localeCompare(b.unit || ''));
+                    document.getElementById('staff-count-num').textContent = list.length;
+                    let html = '<table class="teacher-table"><thead><tr><th>?è¢ ?Æ‰?</th><th>?íº ?∑Á®±</th><th>?ë§ ÂßìÂ?</th><th>?? Ë™≤Ë°®</th><th>?? ?òÂ?</th><th>?? ÁßëÁõÆ</th><th>?? ?ÜÊ?</th></tr></thead><tbody>';
+                    list.forEach(t => {
+                        const disp = getDisplayName(t, db.settings, db.isInternalEmail); const has = scheduled.has(t.name);
+                        html += `<tr><td>${t.unit}</td><td>${t.title}</td><td>${disp}</td><td>${has ? `<a onclick="router.navigate('teacher_detail',{id:'${t.id}'})" style="cursor:pointer; font-size:1.2em; text-decoration:none;">??</a>` : ''}</td><td>${t.field}</td><td>${t.subject}</td><td>${t.extension}</td></tr>`;
+                    });
+                    document.getElementById('main-list-table-area').innerHTML = html + '</tbody></table>';
+                };
+
+                // ?¢Âæ©?Ä??                const state = pageStates.teachers;
+                const searchInput = document.getElementById('main-list-search');
+                searchInput.value = state.search;
+
+                // ?æÂá∫Ë©≤Â??®Á??âÈ?
+                const btns = document.querySelectorAll('#page-teachers .nav-btn');
+                let foundBtn = null;
+                btns.forEach(btn => {
+                    if (btn.dataset.type === state.filterType && (state.filterType === 'all' || btn.dataset.val === state.filterVal)) {
+                        foundBtn = btn;
+                    }
+                });
+                if (foundBtn) {
+                    foundBtn.classList.add('active');
+                    document.getElementById('staff-count-label-txt').textContent = foundBtn.textContent;
+                } else {
+                    btns[0].classList.add('active');
+                }
+
+                renderMainList(state.filterType, state.filterVal, state.search);
+
+                document.querySelectorAll('#page-teachers .nav-btn').forEach(btn => {
+                    btn.onclick = () => {
+                        document.querySelectorAll('#page-teachers .nav-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        document.getElementById('staff-count-label-txt').textContent = btn.textContent;
+                        renderMainList(btn.dataset.type, btn.dataset.val, document.getElementById('main-list-search').value);
+                    };
+                });
+                document.getElementById('main-list-search').onkeyup = (e) => {
+                    const act = document.querySelector('#page-teachers .nav-btn.active');
+                    renderMainList(act.dataset.type, act.dataset.val, e.target.value);
+                };
+            });
+        }
+
+        function initClassList() {
+            const container = document.getElementById('page-classes');
+            container.innerHTML = `
+                <div class="container">
+                    <div class="global-nav">
+                        <div class="nav-links">
+                            <a onclick="router.navigate('index')">?? È¶ñÈ?</a>
+                            <span>|</span>
+                            <a onclick="router.navigate('teachers')">?ë• ?ôÂ∏´?óË°®</a>
+                            <span>|</span>
+                            <span class="current">?? ?≠Á??óË°®</span>
+                        </div>
+                    </div>
+                    <h1 style="color:#0f172a; margin: 0 0 5px 0; font-size: 1.6em;">?? ${(DB?.settings?.schoolName) || ''} ?≠Á??óË°®Ê∏ÖÂñÆ</h1>
+                    <div id="class-list-content"></div>
+                </div>`;
+
+            const div = document.getElementById('class-list-content');
+            ensureData(db => {
+                fetchWithCache('getClassList', [], res => {
+                    let html = '';[1, 2, 3].forEach(y => {
+                        html += `<div class="grade-section"><div class="grade-title">${y}Âπ¥Á?</div><div class="class-grid">`;
+                        res.classes.filter(c => c.code.startsWith(y)).forEach(c => {
+                            const classNum = parseInt(c.code.slice(1)); const isSpecial = classNum > 23; const isDigits3 = /^\d{3}$/.test(c.name);
+                            const style = isSpecial ? 'special' : 'standard'; const digitStyle = isDigits3 ? 'digits-3' : '';
+                            html += `<div class="class-btn ${style} ${digitStyle}" onclick="router.navigate('class_detail',{code:'${c.code}'})">${c.name}</div>`;
+                        });
+                        html += `</div></div>`;
+                    }); div.innerHTML = html;
+                }, 'CLASS_LIST');
+            });
+        }
+
+        let isDetailInit = false; let detailTeachers = []; let currentFilter = { type: 'all', val: '' }; let currentTId = '';
+        const CATS = [{ label: '?®Ê†°', type: 'all', val: '' }, { title: 'Ë°åÊîø?Æ‰?' }, { label: '?ôÂ???, type: 'unit', val: '?ôÂ??? }, { label: 'Â≠∏Â???, type: 'unit', val: 'Â≠∏Â??? }, { label: 'Á∏ΩÂ???, type: 'unit', val: 'Á∏ΩÂ??? }, { label: 'ËºîÂ?ÂÆ?, type: 'unit', val: 'ËºîÂ?ÂÆ? }, { title: 'Âπ¥Á?Â∞éÂ∏´' }, { label: '‰∏ÄÂπ¥Á?', type: 'unit', val: '‰∏ÄÂπ¥Á?Â∞éÂ∏´' }, { label: '‰∫åÂπ¥Á¥?, type: 'unit', val: '‰∫åÂπ¥Á¥öÂ?Â∏? }, { label: '‰∏âÂπ¥Á¥?, type: 'unit', val: '‰∏âÂπ¥Á¥öÂ?Â∏? }, { title: '?ôÂ≠∏?òÂ?' }, { label: '?ãÊ?', type: 'sub_chinese', val: 'Ë™ûÊ?' }, { label: '?±Ë?', type: 'sub_english', val: '?±Ë?' }, { label: '?∏Â≠∏', type: 'field', val: '?∏Â≠∏' }, { label: '?™ÁÑ∂', type: 'field', val: '?™ÁÑ∂' }, { label: 'Á§æÊ?', type: 'field', val: 'Á§æÊ?' }, { label: '?ùÊ?', type: 'field', val: '?ùË??á‰∫∫?? }, { label: '?•È?', type: 'field', val: '?•È?' }, { label: 'ÁßëÊ?', type: 'field', val: 'ÁßëÊ?' }, { label: 'Á∂úÂ?', type: 'field', val: 'Á∂úÂ?' }];
+
+        function initTeacherDetail(id, skipJump = false) {
+            const container = document.getElementById('page-teacher-detail');
+            container.innerHTML = `
+                <div class="detail-wrapper">
+                    <div class="col-cats" id="desktop-cats"></div>
+                    <div class="col-list">
+                        <div class="list-search-box">
+                            <input type="text" id="desktop-search" class="list-search-input" placeholder="?úÂ??ÅÂ∏´..." onkeyup="renderDetailList()">
+                        </div>
+                        <div id="desktop-list-body" class="list-scroll-area"></div>
+                    </div>
+                    <div class="col-main">
+                        <div class="global-nav" style="border:none; padding-bottom:5px;">
+                            <div class="nav-links">
+                                <a onclick="router.navigate('index')">?? È¶ñÈ?</a>
+                                <span>|</span>
+                                <a onclick="router.navigate('teachers')">?ë• ?ôÂ∏´?óË°®</a>
+                                <span>|</span>
+                                <a onclick="router.navigate('classes')">?? ?≠Á??óË°®</a>
+                            </div>
+                            <div style="display:flex; gap:10px;">
+                                <a id="adj-btn-link" href="#" target="_blank" class="print-btn" style="background:#f59e0b; text-decoration:none;">?ôÔ? Ë™ø‰ª£Ë™≤Á≥ªÁµ?/a>
+                                <button onclick="window.print()" class="print-btn">?ñ®Ô∏??óÂç∞Ë™≤Ë°®</button>
+                            </div>
+                        </div>
+                        <h1 id="teacher-detail-title" style="text-align:center; font-size:1.35em; margin: 2px 0 5px 0; color:#0f172a;">ËºâÂÖ•‰∏?..</h1>
+                        <div id="teacher-detail-content"></div>
+                    </div>
+                </div>`;
+
+            currentTId = id; document.getElementById('adj-btn-link').href = `${baseUrl}?page=adjustment&id=${id}`;
+            ensureData(db => {
+                if (!isDetailInit) {
+                    const scheduled = new Set(db.schedules.map(s => s.tname));
+                    detailTeachers = db.teachers.filter(t => scheduled.has(t.name)).sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.unit || '').localeCompare(b.unit || ''));
+                    isDetailInit = true;
+                }
+
+                renderDetailCats(); // ÊØèÊ¨°?≤ÂÖ•?ΩË??çÁπ™?¥È?Ê¨?
+                // ?¢Âæ©?ñÊòØ?ùÂ??ñÈ?ÊøæÁ???                if (!skipJump) {
+                    const target = db.teachers.find(t => t.id === id);
+                    if (target) {
+                        let newType = 'all'; let newVal = ''; const subj = target.subject || ''; const field = target.field || '';
+                        if (subj.includes('??)) { newType = 'sub_english'; newVal = '?±Ë?'; } else if (field === 'Ë™ûÊ?') { newType = 'sub_chinese'; newVal = 'Ë™ûÊ?'; } else if (field) { newType = 'field'; newVal = field; } else if (target.unit.includes('Â∞éÂ∏´')) { newType = 'unit'; newVal = target.unit; } else if (target.unit.includes('??) || target.unit.includes('ÂÆ?)) { newType = 'unit'; newVal = target.unit; }
+                        currentFilter = { type: newType, val: newVal };
+                    }
+                } else {
+                    // ?•ÊòØÂæûÂ?Ë°®È??û‰??ÑÔ??óË©¶?¢Âæ© state
+                    currentFilter.type = pageStates.teacherDetail.filterType || 'all';
+                    currentFilter.val = pageStates.teacherDetail.filterVal || '';
+                }
+
+                updateCatActiveState();
+
+                // ?¢Âæ©?úÂ?Â≠ó‰∏≤
+                const searchInput = document.getElementById('desktop-search');
+                if (searchInput) searchInput.value = pageStates.teacherDetail.search || '';
+
+                renderDetailList();
+                renderDetailTimetable(id);
+            });
+        }
+
+        function renderDetailCats() {
+            const div = document.getElementById('desktop-cats'); let html = '';
+            CATS.forEach(c => { if (c.title) html += `<div class="cat-group">${c.title}</div>`; else html += `<div class="cat-btn" data-type="${c.type}" data-val="${c.val}" onclick="changeFilter('${c.type}','${c.val}', this)">${c.label}</div>`; });
+            div.innerHTML = html; updateCatActiveState();
+        }
+
+        function updateCatActiveState() {
+            document.querySelectorAll('#desktop-cats .cat-btn').forEach(b => { b.classList.remove('active'); if (b.dataset.type === currentFilter.type && b.dataset.val === currentFilter.val) { b.classList.add('active'); b.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } });
+        }
+
+        window.changeFilter = function (type, val, el) { currentFilter = { type, val }; updateCatActiveState(); renderDetailList(); }
+
+        function renderDetailList() {
+            const div = document.getElementById('desktop-list-body'); const search = document.getElementById('desktop-search').value.toLowerCase();
+            const filtered = detailTeachers.filter(t => {
+                let matchF = false; if (currentFilter.type === 'all') matchF = true; else if (currentFilter.type === 'sub_english') matchF = (t.subject || '').includes('??); else if (currentFilter.type === 'sub_chinese') matchF = (t.field === 'Ë™ûÊ?') && !(t.subject || '').includes('??); else if (currentFilter.type === 'field') matchF = (t.field || '').includes(currentFilter.val) || (t.subject || '').includes(currentFilter.val); else matchF = t[currentFilter.type] === currentFilter.val; return matchF && t.name.toLowerCase().includes(search);
+            });
+            let html = ''; filtered.forEach(t => { const disp = getDisplayName(t, DB.settings, DB.isInternalEmail); const tagLabel = t.subject || t.field || ''; html += `<div class="list-item" id="list-item-${t.id}" onclick="onTeacherClick('${t.id}')"><div class="t-name-row">${disp}</div><div class="t-tags-row"><span class="t-tag">${t.title}</span><span class="t-tag blue">${tagLabel}</span></div></div>`; });
+            div.innerHTML = html; highlightList(currentTId);
+        }
+
+        window.onTeacherClick = function (id) { router.navigate('teacher_detail', { id: id }); const input = document.getElementById('desktop-search'); if (input) input.value = ''; renderDetailList(); }
+        function highlightList(id) { document.querySelectorAll('.list-item').forEach(el => el.classList.remove('active')); const target = document.getElementById('list-item-' + id); if (target) { target.classList.add('active'); target.scrollIntoView({ block: 'center' }); } }
+
+        function renderDetailTimetable(id) {
+            fetchWithCache('getTeacherTimetable', [id], res => {
+                if (!res) return;
+                const disp = getDisplayName({ name: res.teacherName, maskedName: res.maskedName }, res.settings, res.isInternalEmail);
+                document.getElementById('teacher-detail-title').textContent = '?ôÂ∏´Ë™≤Ë°®Ôº? + disp;
+                let html = '<div class="timetable-table-wrap"><table class="timetable-table"><thead><tr><th class="period-label">ÁØÄÊ¨?/th><th>?±‰?</th><th>?±‰?</th><th>?±‰?</th><th>?±Â?</th><th>?±‰?</th></tr></thead><tbody>';
+                for (let p = 0; p <= 8; p++) { html += `<tr><td class="period-label">${p === 0 ? '?©Ëá™‰ø? : p}</td>`; for (let d = 1; d <= 5; d++) { const c = (res.timetable[d] && res.timetable[d][p]) ? res.timetable[d][p] : null; if (c) { html += `<td><div class="subject-name">${c.subjectName}</div><a onclick="router.navigate('class_detail',{code:'${c.classCode}'})" class="link-text">${c.className}</a></td>`; } else html += '<td></td>'; } html += '</tr>'; }
+                document.getElementById('teacher-detail-content').innerHTML = html + '</tbody></table></div>';
+            }, 'TT_' + id);
+        }
+
+        let isClassDetailInit = false; let allClassData = []; let currentGrade = '1'; let currentClassCode = '';
+        function initClassDetail(code) {
+            const container = document.getElementById('page-class-detail');
+            container.innerHTML = `
                 <div class="detail-wrapper">
                     <div class="col-class-nav">
                         <div class="class-tabs">
-                            <div class="class-tab" onclick="switchGrade('1', this)">‰∏ÄÂπ¥Á¥ö</div>
-                            <div class="class-tab" onclick="switchGrade('2', this)">‰∫åÂπ¥Á¥ö</div>
-                            <div class="class-tab" onclick="switchGrade('3', this)">‰∏âÂπ¥Á¥ö</div>
+                            <div class="class-tab" onclick="switchClassTab('1', this)">‰∏ÄÂπ¥Á?</div>
+                            <div class="class-tab" onclick="switchClassTab('2', this)">‰∫åÂπ¥Á¥?/div>
+                            <div class="class-tab" onclick="switchClassTab('3', this)">‰∏âÂπ¥Á¥?/div>
                         </div>
-                        <div id="c-detail-nav" class="list-scroll-area" style="padding:5px;"></div>
+                        <div id="class-matrix-body" class="class-columns-container"></div>
                     </div>
                     <div class="col-main">
-                        <div class="global-nav">
+                        <div class="global-nav" style="border:none; padding-bottom:5px;">
                             <div class="nav-links">
-                                <a onclick="router.navigate('index')">È¶ñÈ†Å</a><span>/</span><a
-                                    onclick="router.navigate('classes')">Áè≠Á¥ö</a>
+                                <a onclick="router.navigate('index')">?? È¶ñÈ?</a>
+                                <span>|</span>
+                                <a onclick="router.navigate('teachers')">?ë• ?ôÂ∏´?óË°®</a>
+                                <span>|</span>
+                                <a onclick="router.navigate('classes')">?? ?≠Á??óË°®</a>
                             </div>
-                            <button class="print-btn" onclick="window.print()">üñ®Ô∏è ÂàóÂç∞</button>
+                            <button onclick="window.print()" class="print-btn">?ñ®Ô∏??óÂç∞Ë™≤Ë°®</button>
                         </div>
-                        <h2 id="c-detail-title" style="text-align:center; margin-bottom:15px;"></h2>
-                        <div id="c-detail-tt"></div>
+                        <h1 id="class-detail-title" style="text-align:center; font-size:1.35em; margin: 2px 0 5px 0; color:#0f172a;">ËºâÂÖ•‰∏?..</h1>
+                        <div id="class-detail-content"></div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
+                </div>`;
 
-    <!-- Application Logic -->
-    <script>
-        // --- Core Data & Cache ---
-        let DB = null;
-        let lastFilter = { type: 'all', val: '' };
-        let currentDetailFilter = { type: 'all', val: '' };
-        let currentTId = '';
-        let currentClassGrade = '1';
-        let currentClassCode = '';
-
-        const FECache = {
-            get: (k) => JSON.parse(localStorage.getItem('FSJH_V2_' + k) || 'null'),
-            set: (k, v) => localStorage.setItem('FSJH_V2_' + k, JSON.stringify(v)),
-            clear: () => localStorage.clear()
-        };
-
-        function initApp() {
-            // Check cache first
-            const cached = FECache.get('FULL_DB');
-            if (cached && (new Date().getTime() - cached.ts < 3600000 * 6)) { // 6hr TTL
-                DB = cached.data;
-                console.log('Loaded from cache');
-                startRouter();
-                // Background sync
-                fetchDB(true);
-            } else {
-                fetchDB();
-            }
-        }
-
-        function fetchDB(bg = false) {
-            if (!bg) document.getElementById('app-loader').style.display = 'flex';
-
-            // Call our Adapter (which calls fetch)
-            window.google.script.run.withSuccessHandler(res => {
-                if (res) {
-                    DB = res;
-                    FECache.set('FULL_DB', { ts: new Date().getTime(), data: res });
-                    if (!bg) startRouter();
-                } else {
-                    alert('Ë≥áÊñôÂêåÊ≠•Â§±Êïó');
-                }
-                document.getElementById('app-loader').style.opacity = '0';
-                setTimeout(() => document.getElementById('app-loader').style.display = 'none', 500);
-            }).getFullSystemSync();
-        }
-
-        function ensureData(cb) {
-            if (DB) cb(DB);
-            else {
-                // Wait for DB (should be handled by initApp, but just in case)
-                setTimeout(() => ensureData(cb), 100);
-            }
-        }
-
-        function startRouter() {
-            applySettings();
-            // Handle URL params
-            const params = new URLSearchParams(window.location.search);
-            const page = params.get('page') || 'index';
-            const locationStart = {
-                parameter: {
-                    page: page,
-                    id: params.get('id'),
-                    code: params.get('code')
-                }
-            };
-            router.load(locationStart.parameter.page, locationStart.parameter);
-        }
-
-        function applySettings() {
-            if (DB?.settings?.schoolName) document.getElementById('home-school-name').textContent = DB.settings.schoolName + ' Ë™≤Ë°®Êü•Ë©¢Á≥ªÁµ±';
-        }
-
-        // --- Router ---
-        const router = {
-            navigate: function (page, params = {}) {
-                window.google.script.history.push(null, params, page);
-                this.load(page, params);
-                window.scrollTo(0, 0);
-            },
-            load: function (page, params) {
-                document.querySelectorAll('.page-view').forEach(el => el.classList.remove('active'));
-                const target = document.getElementById('page-' + page);
-                if (target) {
-                    target.classList.add('active');
-                    if (page === 'teachers') renderTeacherList();
-                    if (page === 'classes') renderClassList();
-                    if (page === 'teacher_detail') initTeacherDetail(params.id);
-                    if (page === 'class_detail') initClassDetail(params.code);
-                } else {
-                    document.getElementById('page-index').classList.add('active');
-                }
-            }
-        };
-
-        // --- Helper: Get Display Name ---
-        function getDispName(t) {
-            if (!t) return '';
-            const settings = DB.settings || {};
-            const mode = settings.mode || 'OFF';
-            let name = t.name || t.tname || t.teacher || '';
-            let masked = t.maskedName || t.maskedTeacher || '';
-            if (!masked && name) masked = name[0] + 'ËÄÅÂ∏´';
-
-            // In API mode, always external unless we implement IP check logic locally
-            return mode === 'ALL' ? masked : (mode === 'OFF' ? name : masked);
-        }
-
-        // --- View: Teachers List ---
-        function renderTeacherList() {
-            filterTeacherList(lastFilter.type, lastFilter.val);
-        }
-
-        window.filterTeacherList = function (type, val, btn) {
-            lastFilter = { type, val };
-            if (btn) {
-                document.querySelectorAll('#page-teachers .nav-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-            }
-            const search = (document.getElementById('t-search').value || '').toLowerCase();
-
-            const scheduled = new Set(DB.schedules.map(s => s.tname));
-
-            let list = DB.teachers.filter(t => {
-                let match = true;
-                if (type !== 'all') {
-                    if (type === 'field') match = (t.field && t.field.includes(val));
-                    else match = (t[type] === val);
-                }
-                const dn = getDispName(t);
-                return match && dn.toLowerCase().includes(search);
-            });
-
-            // Sort
-            list.sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.unit || '').localeCompare(b.unit || ''));
-
-            let html = '<table class="teacher-table"><thead><tr><th>ËÅ∑Á®±</th><th>ÂßìÂêç</th><th>Ë™≤Ë°®</th><th>ÂñÆ‰Ωç</th></tr></thead><tbody>';
-            list.forEach(t => {
-                const has = scheduled.has(t.name);
-                html += `<tr>
-                    <td>${t.title}</td>
-                    <td>${getDispName(t)}</td>
-                    <td>${has ? `<a onclick="router.navigate('teacher_detail',{id:'${t.id}'})" style="cursor:pointer; font-size:1.2em;">üìÖ</a>` : ''}</td>
-                    <td>${t.unit}</td>
-                </tr>`;
-            });
-            document.getElementById('teacher-list-area').innerHTML = html + '</tbody></table>';
-        }
-
-        // --- View: Classes List ---
-        function renderClassList() {
-            const classCounts = new Map();
-            const classHasCore = new Map();
-            DB.schedules.forEach(s => {
-                classCounts.set(s.classCode, (classCounts.get(s.classCode) || 0) + 1);
-                // Simple heuristic for core class
-                if (s.period >= 1 && s.period <= 7) classHasCore.set(s.classCode, true);
-            });
-
-            // Unique classes
-            const classes = [];
-            const processed = new Set();
-            DB.schedules.forEach(s => {
-                if (!processed.has(s.classCode)) {
-                    classes.push({ code: s.classCode, name: s.className });
-                    processed.add(s.classCode);
-                }
-            });
-
-            // Filter valid classes
-            const valid = classes.filter(c => classCounts.get(c.code) > 3 && classHasCore.get(c.code))
-                .sort((a, b) => a.code.localeCompare(b.code));
-
-            let html = '';
-            ['1', '2', '3'].forEach(g => {
-                html += `<div class="grade-section"><div class="grade-title">${g}Âπ¥Á¥ö</div><div class="class-grid">`;
-                valid.filter(c => c.code.startsWith(g)).forEach(c => {
-                    html += `<div class="class-btn" onclick="router.navigate('class_detail',{code:'${c.code}'})">${c.name}</div>`;
-                });
-                html += `</div></div>`;
-            });
-            document.getElementById('class-list-area').innerHTML = html;
-        }
-
-        // --- View: Teacher Detail ---
-        const CATS = [
-            { label: 'ÂÖ®Ê†°', type: 'all', val: '' },
-            { label: 'ÊïôÂãôËôï', type: 'unit', val: 'ÊïôÂãôËôï' },
-            { label: 'Â≠∏ÂãôËôï', type: 'unit', val: 'Â≠∏ÂãôËôï' },
-            { label: '‰∏ÄÂπ¥Á¥ö', type: 'unit', val: '‰∏ÄÂπ¥Á¥öÂ∞éÂ∏´' },
-            { label: '‰∫åÂπ¥Á¥ö', type: 'unit', val: '‰∫åÂπ¥Á¥öÂ∞éÂ∏´' },
-            { label: '‰∏âÂπ¥Á¥ö', type: 'unit', val: '‰∏âÂπ¥Á¥öÂ∞éÂ∏´' },
-            { label: 'ÂúãÊñá', type: 'sub', val: 'Ë™ûÊñá' },
-            { label: 'Êï∏Â≠∏', type: 'field', val: 'Êï∏Â≠∏' },
-            { label: 'Ëá™ÁÑ∂', type: 'field', val: 'Ëá™ÁÑ∂' }
-        ];
-
-        function initTeacherDetail(id) {
-            currentTId = id;
-            document.getElementById('adj-link').href = `${GAS_API_URL.replace('/exec', '')}?page=adjustment&id=${id}`;
-
-            // Render cats
-            let catHtml = '';
-            CATS.forEach(c => {
-                catHtml += `<div class="cat-btn" onclick="filterDetailTeacher('${c.type}','${c.val}', this)">${c.label}</div>`;
-            });
-            document.getElementById('t-detail-cats').innerHTML = catHtml;
-
-            renderDetailTeacherList();
-            if (id) renderTeacherTimetable(id);
-        }
-
-        window.filterDetailTeacher = function (type, val, el) {
-            currentDetailFilter = { type, val };
-            if (el) {
-                document.querySelectorAll('#t-detail-cats .cat-btn').forEach(b => b.classList.remove('active'));
-                el.classList.add('active');
-            }
-            renderDetailTeacherList();
-        }
-
-        function renderDetailTeacherList() {
-            const search = (document.getElementById('t-detail-search').value || '').toLowerCase();
-            const scheduled = new Set(DB.schedules.map(s => s.tname));
-
-            // Only show teachers with schedule in detail view
-            const list = DB.teachers.filter(t => scheduled.has(t.name)).filter(t => {
-                let match = true;
-                if (currentDetailFilter.type !== 'all') {
-                    if (currentDetailFilter.type === 'sub') match = (t.field === 'Ë™ûÊñá'); // simplified
-                    else match = t[currentDetailFilter.type] === currentDetailFilter.val;
-                }
-                return match && getDispName(t).toLowerCase().includes(search);
-            });
-
-            let html = '';
-            list.forEach(t => {
-                const active = t.id === currentTId ? 'active' : '';
-                html += `<div class="list-item ${active}" id="t-item-${t.id}" onclick="router.navigate('teacher_detail',{id:'${t.id}'})">${getDispName(t)}</div>`
-            });
-            document.getElementById('t-detail-list').innerHTML = html;
-
-            if (currentTId) {
-                setTimeout(() => {
-                    const el = document.getElementById('t-item-' + currentTId);
-                    if (el) el.scrollIntoView({ block: 'center' });
-                }, 100);
-            }
-        }
-
-        function renderTeacherTimetable(id) {
-            const t = DB.teachers.find(x => x.id === id);
-            if (!t) return;
-            const tname = t.name;
-            document.getElementById('t-detail-title').textContent = getDispName(t) + ' Ë™≤Ë°®';
-
-            // Build Matrix
-            const tt = {};
-            DB.schedules.filter(s => s.tname === tname).forEach(s => {
-                if (!tt[s.day]) tt[s.day] = {};
-                tt[s.day][s.period] = s;
-            });
-
-            let html = '<div class="timetable-table-wrap"><table class="timetable-table"><thead><tr><th class="period-label">ÁØÄ</th><th>‰∏Ä</th><th>‰∫å</th><th>‰∏â</th><th>Âõõ</th><th>‰∫î</th></tr></thead><tbody>';
-            for (let p = 0; p <= 8; p++) {
-                html += `<tr><td class="period-label">${p === 0 ? 'Êó©' : p}</td>`;
-                for (let d = 1; d <= 5; d++) {
-                    const s = (tt[d] && tt[d][p]) ? tt[d][p] : null;
-                    if (s) {
-                        html += `<td><div class="subject-name">${s.subjectName}</div><a onclick="router.navigate('class_detail',{code:'${s.classCode}'})" class="link-text">${s.className}</a></td>`;
-                    } else {
-                        html += '<td></td>';
-                    }
-                }
-                html += '</tr>';
-            }
-            document.getElementById('t-detail-tt').innerHTML = html + '</tbody></table></div>';
-        }
-
-        // --- View: Class Detail ---
-        function initClassDetail(code) {
             currentClassCode = code;
-            if (code) currentClassGrade = code[0];
-
-            switchGrade(currentClassGrade);
-            if (code) renderClassTimetable(code);
-        }
-
-        window.switchGrade = function (g, el) {
-            currentClassGrade = g;
-            document.querySelectorAll('.class-tab').forEach(t => t.classList.remove('active'));
-            if (el) el.classList.add('active'); // simplified logic
-
-            const processed = new Set();
-            const classes = [];
-            DB.schedules.forEach(s => {
-                // Simple Count Filter again
-                if (!processed.has(s.classCode) && s.classCode.startsWith(g)) {
-                    classes.push({ code: s.classCode, name: s.className });
-                    processed.add(s.classCode);
+            ensureData(db => {
+                if (!isClassDetailInit) {
+                    const classSet = new Map(); const classCounts = new Map(); const classHasCore = new Map();
+                    db.schedules.forEach(s => {
+                        classSet.set(s.classCode, s.className); classCounts.set(s.classCode, (classCounts.get(s.classCode) || 0) + 1);
+                        const p = parseInt(String(s.period)); if (!isNaN(p) && p >= 1 && p <= 7) { classHasCore.set(s.classCode, true); }
+                    });
+                    allClassData = Array.from(classSet.entries()).filter(([c, n]) => classCounts.get(c) > 3 && classHasCore.get(c)).sort((a, b) => a[0].localeCompare(b[0])).map(([code, name]) => ({ code, name }));
+                    isClassDetailInit = true;
                 }
+                if (code) currentGrade = code.charAt(0); renderClassNav(); renderClassTimetable(code);
             });
-
-            classes.sort((a, b) => a.code.localeCompare(b.code));
-
-            let html = '<div class="class-grid" style="grid-template-columns: repeat(3, 1fr);">';
-            classes.forEach(c => {
-                const active = c.code === currentClassCode ? 'active' : '';
-                html += `<div class="class-btn-mini ${active}" onclick="router.navigate('class_detail',{code:'${c.code}'})">${c.name}</div>`;
-            });
-            document.getElementById('c-detail-nav').innerHTML = html + '</div>';
         }
-
+        function renderClassNav() {
+            document.querySelectorAll('.class-tab').forEach(t => { t.classList.remove('active'); if (t.getAttribute('onclick').includes(currentGrade)) t.classList.add('active'); });
+            const container = document.getElementById('class-matrix-body'); const filtered = allClassData.filter(c => c.code.startsWith(currentGrade));
+            let cols = ['', '', ''];
+            filtered.forEach((c, index) => {
+                const targetCol = Math.min(Math.floor(index / 10), 2);
+                const classNum = parseInt(c.code.slice(1)); const isSpecial = classNum > 23; const isDigits3 = /^\d{3}$/.test(c.name);
+                const active = c.code === currentClassCode ? 'active' : ''; const special = isSpecial ? 'special' : 'standard'; const digitStyle = isDigits3 ? 'digits-3' : '';
+                cols[targetCol] += `<div class="class-btn-mini ${special} ${digitStyle} ${active}" id="class-btn-${c.code}" onclick="onClassClick('${c.code}')">${c.name}</div>`;
+            });
+            container.innerHTML = `<div class="class-col">${cols[0]}</div><div class="class-col">${cols[1]}</div><div class="class-col">${cols[2]}</div>`;
+            const target = document.getElementById('class-btn-' + currentClassCode); if (target) target.scrollIntoView({ block: 'center' });
+        }
+        window.switchClassTab = function (grade, el) { currentGrade = grade; renderClassNav(); }
+        window.onClassClick = function (code) { currentClassCode = code; router.navigate('class_detail', { code: code }); renderClassNav(); renderClassTimetable(code); }
         function renderClassTimetable(code) {
-            // Find class name
-            const sample = DB.schedules.find(s => s.classCode === code);
-            const className = sample ? sample.className : code;
-            document.getElementById('c-detail-title').textContent = className + ' Ë™≤Ë°®';
-
-            // Build Matrix
-            const tt = {};
-            DB.schedules.filter(s => s.classCode === code).forEach(s => {
-                if (!tt[s.day]) tt[s.day] = {};
-                tt[s.day][s.period] = s;
-            });
-
-            let html = '<div class="timetable-table-wrap"><table class="timetable-table"><thead><tr><th class="period-label">ÁØÄ</th><th>‰∏Ä</th><th>‰∫å</th><th>‰∏â</th><th>Âõõ</th><th>‰∫î</th></tr></thead><tbody>';
-            for (let p = 0; p <= 8; p++) {
-                html += `<tr><td class="period-label">${p === 0 ? 'Êó©' : p}</td>`;
-                for (let d = 1; d <= 5; d++) {
-                    const s = (tt[d] && tt[d][p]) ? tt[d][p] : null;
-                    if (s) {
-                        const teacherDisp = getDispName({ name: s.tname, maskedName: s.maskedTeacher });
-                        html += `<td><div class="subject-name">${s.subjectName}</div><a onclick="router.navigate('teacher_detail',{id:'${s.tid}'})" class="link-text">${teacherDisp}</a></td>`;
-                    } else {
-                        html += '<td></td>';
-                    }
-                }
-                html += '</tr>';
-            }
-            document.getElementById('c-detail-tt').innerHTML = html + '</tbody></table></div>';
+            fetchWithCache('getClassTimetable', [code], res => {
+                if (!res) return;
+                document.getElementById('class-detail-title').textContent = '?≠Á?Ë™≤Ë°®Ôº? + res.className;
+                let html = '<div class="timetable-table-wrap"><table class="timetable-table"><thead><tr><th class="period-label">ÁØÄÊ¨?/th><th>?±‰?</th><th>?±‰?</th><th>?±‰?</th><th>?±Â?</th><th>?±‰?</th></tr></thead><tbody>';
+                for (let p = 0; p <= 8; p++) { html += `<tr><td class="period-label">${p === 0 ? '?©Ëá™‰ø? : p}</td>`; for (let d = 1; d <= 5; d++) { const c = (res.timetable[d] && res.timetable[d][p]) ? res.timetable[d][p] : null; if (c) { const disp = getDisplayName(c, res.settings, res.isInternalEmail); html += `<td><div class="subject-name">${c.subjectName}</div><a onclick="router.navigate('teacher_detail',{id:'${c.teacherId}'})" class="link-text">${disp}</a></td>`; } else html += '<td></td>'; } html += '</tr>'; }
+                document.getElementById('class-detail-content').innerHTML = html + '</tbody></table></div>';
+            }, 'CLASS_TT_' + code);
         }
-
-        // --- Start ---
-        window.addEventListener('load', initApp);
-
+        document.addEventListener('DOMContentLoaded', () => router.init());
     </script>
 </body>
 
 </html>
+
