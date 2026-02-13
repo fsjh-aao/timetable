@@ -3,7 +3,9 @@
 <!DOCTYPE html>
 <html>
 
-<head><script>
+<head>
+    <meta charset="UTF-8">
+<script>
     // [IMPORTANT] API Endpoint
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbySt-5WOOMa6B3Wh8H3Wk4pc8jyjzBVNfcklXDzTRWv7wXTbG86Jl2frDTclCMTOz1-/exec";
 
@@ -117,7 +119,7 @@
     --tt-header-bg: #dfe6e9;
   }
 
-  /* ?��?修正：徹底�???Chrome ??Font Boosting (?�是?��?一秒�??��??�主?? */
+  /* 核心修正：徹底封印 Chrome 的 Font Boosting (這是停頓一秒後卡住的主因) */
   html,
   body {
     -webkit-text-size-adjust: none !important;
@@ -131,7 +133,7 @@
     font-family: 'Noto Sans TC', sans-serif;
     color: var(--text-color);
     font-size: 15px;
-    /* 移除之�??�?��?增�? Chrome 負�??��??��??�勢?�制 */
+    /* 移除之前所有會增加 Chrome 負擔的動畫與手勢限制 */
   }
 
   .container {
@@ -386,7 +388,7 @@
     const mode = settings ? (settings.mode || 'OFF') : 'OFF';
     const name = t.name || t.teacher || "";
     let maskedName = t.maskedName || t.maskedTeacher || "";
-    if (!maskedName && name) maskedName = (name.length > 0) ? name[0] + '?�師' : name;
+    if (!maskedName && name) maskedName = (name.length > 0) ? name[0] + '老師' : name;
     if (mode === 'ALL') return maskedName;
     if (mode === 'OFF') return name;
     if (isInternalEmail) return name;
@@ -463,7 +465,7 @@
   }
 </script>
     <style>
-        /* ?��??�置?�基礎設�?*/
+        /* 全局重置與基礎設定 */
         body {
             margin: 0;
             padding: 0;
@@ -526,7 +528,7 @@
             font-weight: bold;
         }
 
-        /* 風格 v6.1 - ?�調?��??��? */
+        /* 風格 v6.1 - 藍調玻璃擬態 */
         :root {
             --brand-primary: #2563eb;
             --brand-dark: #0f172a;
@@ -652,7 +654,7 @@
             margin-bottom: 5px;
         }
 
-        /* --- 詳�??��?三�?佈�??��? --- */
+        /* --- 詳情頁：三欄佈局鎖定 --- */
         .detail-wrapper {
             display: flex;
             flex-direction: row;
@@ -789,7 +791,7 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
         }
 
-        /* --- ?�師?�表?��?件�?湊�? --- */
+        /* --- 教師列表頁元件緊湊化 --- */
         .nav-rows-container {
             display: flex;
             flex-direction: column;
@@ -868,7 +870,7 @@
             margin-left: 0;
         }
 
-        /* --- 課表�??：�?度�?對統一 (v5.9.8) --- */
+        /* --- 課表樣式：高度絕對統一 (v5.9.8) --- */
         .timetable-table {
             width: 100%;
             max-width: 850px;
@@ -921,7 +923,7 @@
             cursor: pointer;
         }
 
-        /* --- ?��??��? --- */
+        /* --- 班級相關 --- */
         .col-class-nav {
             width: 250px;
             flex-shrink: 0;
@@ -1187,12 +1189,12 @@
             }
         }
 
-        /* --- 轉場?��??�畫 (Ripple Transition) --- */
+        /* --- 轉場核心動畫 (Ripple Transition) --- */
         #transition-loader {
             position: fixed;
             inset: 0;
             background: #1e40af;
-            /* ?��?首�? Hero ?�色�?*/
+            /* 與的首頁 Hero 同色系 */
             z-index: 10000;
             display: flex;
             align-items: center;
@@ -1246,7 +1248,7 @@
 </head>
 
 <body>
-    <!-- 轉場?�畫�?-->
+    <!-- 轉場動畫層 -->
     <div id="transition-loader">
         <div class="dot-pulse">
             <div class="pulse-dot"></div>
@@ -1255,14 +1257,14 @@
         </div>
     </div>
 
-    <!-- ?��? Loading ?�罩 -->
+    <!-- 全域 Loading 遮罩 -->
     <div id="app-loader"
         style="position:fixed; top:0; left:0; width:100%; height:100%; background:#0f172a; z-index:9999; display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; transition: opacity 0.5s;">
         <div class="mini-spinner"
             style="width:50px; height:50px; border-width:4px; border-top-color:#3b82f6; margin-bottom:20px;"></div>
-        <div style="font-size:1.5em; font-weight:bold; letter-spacing:2px;">系統載入�?..</div>
+        <div style="font-size:1.5em; font-weight:bold; letter-spacing:2px;">系統載入中...</div>
         <div style="margin-top: 20px; font-size: 11px; color: #aaa;">System Version: v6.3.2</div>
-        <div style="margin-top:10px; color:#94a3b8; font-size:0.9em;">�?��?�步?�?�課表�???/div>
+        <div style="margin-top:10px; color:#94a3b8; font-size:0.9em;">正在同步最新課表資料</div>
     </div>
 
     <div id="app">
@@ -1274,7 +1276,7 @@
     </div>
 
     <div id="sync-status" class="sync-badge">
-        <span class="sync-dot"></span> <span id="sync-text">系統資�?已�?�?/span>
+        <span class="sync-dot"></span> <span id="sync-text">系統資料已同步</span>
     </div>
 
 
@@ -1285,7 +1287,7 @@
         const initialParams = <?!= JSON.stringify(initialParams || {}) ?>;
         const baseUrl = "<?= ScriptApp.getService().getUrl() ?>";
 
-        // ?�?�管?�物�?(?�於?�擬?��??�繪?�恢復�???
+        // 狀態管理物件 (用於虛擬分頁重繪時恢復狀態)
         const pageStates = {
             teachers: { search: '', filterType: 'all', filterVal: '' },
             teacherDetail: { activeId: '', search: '', filterType: 'all', filterVal: '' },
@@ -1323,12 +1325,13 @@
                 page = page || 'index';
                 const wasInTeacherDetail = this.currentPage === 'teacher_detail';
 
-                // 1. ?��??��??�內�?(?�擬?��??��?)
+                // 1. 銷毀舊頁面內容 (虛擬分頁核心)
                 if (this.currentPage && this.currentPage !== page) {
                     this.destroyPage(this.currentPage);
                 }
 
-                // 2. ?��? Active ?�??                document.querySelectorAll('.page-view').forEach(el => el.classList.remove('active'));
+                // 2. 切換 Active 狀態
+                document.querySelectorAll('.page-view').forEach(el => el.classList.remove('active'));
                 const pageId = page === 'class_detail' ? 'page-class-detail' : (page === 'teacher_detail' ? 'page-teacher-detail' : 'page-' + page);
                 const target = document.getElementById(pageId);
                 if (target) {
@@ -1339,14 +1342,16 @@
                     this.currentPage = 'index';
                 }
 
-                // 3. 渲�??��???                this.renderPage(this.currentPage, params, wasInTeacherDetail);
+                // 3. 渲染新頁面
+                this.renderPage(this.currentPage, params, wasInTeacherDetail);
             },
             destroyPage: function (page) {
                 const pageId = page === 'class_detail' ? 'page-class-detail' : (page === 'teacher_detail' ? 'page-teacher-detail' : 'page-' + page);
                 const container = document.getElementById(pageId);
                 if (!container) return;
 
-                // ?��?空�?，�?存特定�??��??�??                if (page === 'teachers') {
+                // 在清空前，保存特定頁面的狀態
+                if (page === 'teachers') {
                     const searchInput = document.getElementById('main-list-search');
                     const activeBtn = document.querySelector('#page-teachers .nav-btn.active');
                     if (searchInput) pageStates.teachers.search = searchInput.value;
@@ -1361,7 +1366,8 @@
                     pageStates.teacherDetail.filterVal = currentFilter.val;
                 }
 
-                container.innerHTML = ''; // 徹�?清空 DOM 節�?            },
+                container.innerHTML = ''; // 徹底清空 DOM 節點
+            },
             renderPage: function (page, params, wasInTeacherDetail) {
                 const container = document.getElementById(page === 'class_detail' ? 'page-class-detail' : (page === 'teacher_detail' ? 'page-teacher-detail' : 'page-' + page));
                 if (!container) return;
@@ -1370,25 +1376,25 @@
                     container.innerHTML = `
                         <div class="home-hero">
                             <div class="mesh-overlay"></div>
-                            <h1 class="home-title">${(DB?.settings?.schoolName) || '課表?�詢系統'}</h1>
-                            <div class="home-subtitle">?�慧?�即?�、精準�??��?課�??��?平台</div>
+                            <h1 class="home-title">${(DB?.settings?.schoolName) || '課表查詢系統'}</h1>
+                            <div class="home-subtitle">智慧、即時、精準的校園課務核心平台</div>
                         </div>
                         <div class="home-grid">
                             <div class="feature-card" onclick="router.navigate('teachers')">
                                 <div class="card-icon"><i class="fa-solid fa-chalkboard-user"></i></div>
-                                <div class="card-title">?�師?�表</div>
-                                <div class="card-desc">快速查詢全?��?師課表、�??�職?��??�學?��??��???/div>
+                                <div class="card-title">教師列表</div>
+                                <div class="card-desc">快速查詢全校教師課表、行政職務與教學領域分類。</div>
                             </div>
                             <div class="feature-card" onclick="router.navigate('classes')">
                                 <div class="card-icon"><i class="fa-solid fa-shapes"></i></div>
-                                <div class="card-title">?��??�表</div>
-                                <div class="card-desc">依年級瀏覽?�班級課表�??�握?��?課�??��???/div>
+                                <div class="card-title">班級列表</div>
+                                <div class="card-desc">依年級瀏覽各班級課表，掌握班級課程動態。</div>
                             </div>
                         </div>
                         <div class="no-print site-footer" style="border-top: 1px solid #f1f5f9; padding-top: 20px;">
-                            ?�� ?�系統由 <b>?�董?�師</b> 設�?維護 | <span
+                            💡 本系統由 <b>王董老師</b> 設計維護 | <span
                                 onclick="window.top.location.href='${baseUrl}?page=admin'"
-                                style="cursor:help; color:#3b82f6;">Powered by <b>Vibe Coding</b> ??</span>
+                                style="cursor:help; color:#3b82f6;">Powered by <b>Vibe Coding</b> 🚀</span>
                         </div>`;
                 } else if (page === 'teachers') {
                     initTeacherList();
@@ -1410,10 +1416,10 @@
                 const cached = FECache.getDB();
                 if (cached && cached.teachers && cached.schedules) {
                     DB = { teachers: cached.teachers, schedules: cached.schedules, settings: cached.settings, isInternalEmail: cached.isInternalEmail };
-                    hideLoader(); // ?��??�面?��?
+                    hideLoader(); // 先讓畫面出來
                     applySystemSettings(DB.settings);
                     cb(DB);
-                    // ?�景?�新
+                    // 背景更新
                     google.script.run.withSuccessHandler(res => {
                         if (res && res.syncTime > (cached.timestamp || 0)) {
                             DB = res; FECache.set('FULL_SYNC', res);
@@ -1422,7 +1428,7 @@
                         }
                     }).getFullSystemSync();
                 } else {
-                    // ?�快?��?強迫載入
+                    // 無快取，強迫載入
                     google.script.run.withSuccessHandler(res => {
                         if (res) {
                             DB = res; FECache.set('FULL_SYNC', res);
@@ -1431,15 +1437,16 @@
                             hideLoader();
                             cb(DB);
                         } else {
-                            alert("資�??�步失�?，�??�新?��??�面??);
+                            alert("資料同步失敗，請重新整理頁面。");
                         }
                     }).withFailureHandler(err => {
-                        alert("網路?�誤: " + err.message);
+                        alert("網路錯誤: " + err.message);
                     }).getFullSystemSync();
                 }
             } catch (e) {
                 console.error("ensureData error:", e);
-                FECache.clear(); // ?��?快�?毀?��??�錯誤�?清除�?                location.reload();
+                FECache.clear(); // 萬一快取毀損導致錯誤，清除它
+                location.reload();
             }
         }
 
@@ -1454,18 +1461,18 @@
         function applySystemSettings(settings) {
             if (!settings) return;
             try {
-                const schoolName = settings.schoolName || '?�校';
-                document.title = schoolName + ' 課表?�詢系統';
+                const schoolName = settings.schoolName || '本校';
+                document.title = schoolName + ' 課表查詢系統';
 
-                // ?�新首�?標�?
+                // 更新首頁標題
                 const heroTitle = document.querySelector('.home-title');
-                if (heroTitle) heroTitle.textContent = schoolName + ' 課表?�詢系統';
+                if (heroTitle) heroTitle.textContent = schoolName + ' 課表查詢系統';
 
-                // ?�新?�師?�表標�?
+                // 更新教師列表標題
                 const teacherTitle = document.querySelector('#page-teachers h1');
                 if (teacherTitle) {
-                    // ?�裡要�?微溫?��?點�?保�? emoji
-                    teacherTitle.innerHTML = '???��??' + schoolName + ' ?�師?�表';
+                    // 這裡要稍微溫柔一點，保留 emoji
+                    teacherTitle.innerHTML = '🧑‍🏫 ' + schoolName + ' 教師列表';
                 }
             } catch (e) { console.warn("applySettings minor error:", e); }
         }
@@ -1473,7 +1480,7 @@
         function updateSyncUI(isNew, time) {
             const txt = document.getElementById('sync-text');
             const badge = document.getElementById('sync-status');
-            if (txt) { txt.textContent = `資�?已�?�?(v${time.getHours()}:${String(time.getMinutes()).padStart(2, '0')})`; setTimeout(() => { if (badge) badge.style.opacity = '0.3'; }, 5000); }
+            if (txt) { txt.textContent = `資料已同步 (v${time.getHours()}:${String(time.getMinutes()).padStart(2, '0')})`; setTimeout(() => { if (badge) badge.style.opacity = '0.3'; }, 5000); }
         }
 
         function initTeacherList() {
@@ -1482,37 +1489,37 @@
                 <div class="container">
                     <div class="global-nav">
                         <div class="nav-links">
-                            <a onclick="router.navigate('index')">?? 首�?</a>
+                            <a onclick="router.navigate('index')">🏠 首頁</a>
                             <span>|</span>
-                            <span class="current">?�� ?�師?�表</span>
+                            <span class="current">👥 教師列表</span>
                             <span>|</span>
-                            <a onclick="router.navigate('classes')">?? ?��??�表</a>
+                            <a onclick="router.navigate('classes')">📚 班級列表</a>
                         </div>
                     </div>
-                    <h1 style="color:#0f172a; margin: 0 0 10px 0; font-size: 1.6em;">???��??${(DB?.settings?.schoolName) || ''} ?�師?�表</h1>
+                    <h1 style="color:#0f172a; margin: 0 0 10px 0; font-size: 1.6em;">🧑‍🏫 ${(DB?.settings?.schoolName) || ''} 教師列表</h1>
                     <div id="teacher-list-content">
                         <div class="nav-rows-container">
                             <div class="nav-row">
-                                <button class="nav-btn" data-type="all">?�校人員</button>
-                                <button class="nav-btn" data-type="unit" data-val="?��???>?��???/button>
-                                <button class="nav-btn" data-type="unit" data-val="學�???>學�???/button>
-                                <button class="nav-btn" data-type="unit" data-val="總�???>總�???/button>
-                                <button class="nav-btn" data-type="unit" data-val="輔�?�?>輔�?�?/button>
-                                <button class="nav-btn" data-type="unit" data-val="一年�?導師">一年�?導師</button>
-                                <button class="nav-btn" data-type="unit" data-val="二年級�?�?>二年級�?�?/button>
-                                <button class="nav-btn" data-type="unit" data-val="三年級�?�?>三年級�?�?/button>
-                                <div class="teacher-search-box">?? <input type="text" id="main-list-search" class="teacher-search-input" placeholder="姓�??��?..."></div>
+                                <button class="nav-btn" data-type="all">全校人員</button>
+                                <button class="nav-btn" data-type="unit" data-val="教務處">教務處</button>
+                                <button class="nav-btn" data-type="unit" data-val="學務處">學務處</button>
+                                <button class="nav-btn" data-type="unit" data-val="總務處">總務處</button>
+                                <button class="nav-btn" data-type="unit" data-val="輔導室">輔導室</button>
+                                <button class="nav-btn" data-type="unit" data-val="一年級導師">一年級導師</button>
+                                <button class="nav-btn" data-type="unit" data-val="二年級導師">二年級導師</button>
+                                <button class="nav-btn" data-type="unit" data-val="三年級導師">三年級導師</button>
+                                <div class="teacher-search-box">🔍 <input type="text" id="main-list-search" class="teacher-search-input" placeholder="姓名搜尋..."></div>
                             </div>
                             <div class="nav-row">
-                                <button class="nav-btn" data-type="title" data-val="專任?�師">專任?�師</button>
-                                <button class="nav-btn" data-type="field" data-val="語�?">語�??��?</button>
-                                <button class="nav-btn" data-type="field" data-val="?�學">?�學?��?</button>
-                                <button class="nav-btn" data-type="field" data-val="?�然">?�然?��?</button>
-                                <button class="nav-btn" data-type="field" data-val="社�?">社�??��?</button>
-                                <button class="nav-btn" data-type="field" data-val="?��??�人??>?��??��?</button>
-                                <button class="nav-btn" data-type="field" data-val="?��?">?��??��?</button>
-                                <button class="nav-btn" data-type="field" data-val="科�?">科�??��?</button>
-                                <div class="staff-count-label">?�� <span id="staff-count-label-txt">?�校人員</span>�?span id="staff-count-num">0</span>�?/div>
+                                <button class="nav-btn" data-type="title" data-val="專任教師">專任教師</button>
+                                <button class="nav-btn" data-type="field" data-val="語文">語文領域</button>
+                                <button class="nav-btn" data-type="field" data-val="數學">數學領域</button>
+                                <button class="nav-btn" data-type="field" data-val="自然">自然領域</button>
+                                <button class="nav-btn" data-type="field" data-val="社會">社會領域</button>
+                                <button class="nav-btn" data-type="field" data-val="藝術與人文">藝文領域</button>
+                                <button class="nav-btn" data-type="field" data-val="健體">健體領域</button>
+                                <button class="nav-btn" data-type="field" data-val="科技">科技領域</button>
+                                <div class="staff-count-label">👥 <span id="staff-count-label-txt">全校人員</span>：<span id="staff-count-num">0</span>人</div>
                             </div>
                         </div>
                         <div id="main-list-table-area"></div>
@@ -1527,19 +1534,20 @@
                         return m && getDisplayName(t, db.settings, db.isInternalEmail).toLowerCase().includes(search.toLowerCase());
                     }).sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.unit || '').localeCompare(b.unit || ''));
                     document.getElementById('staff-count-num').textContent = list.length;
-                    let html = '<table class="teacher-table"><thead><tr><th>?�� ?��?</th><th>?�� ?�稱</th><th>?�� 姓�?</th><th>?? 課表</th><th>?? ?��?</th><th>?? 科目</th><th>?? ?��?</th></tr></thead><tbody>';
+                    let html = '<table class="teacher-table"><thead><tr><th>🏢 單位</th><th>💼 職稱</th><th>👤 姓名</th><th>📅 課表</th><th>📚 領域</th><th>📖 科目</th><th>📞 分機</th></tr></thead><tbody>';
                     list.forEach(t => {
                         const disp = getDisplayName(t, db.settings, db.isInternalEmail); const has = scheduled.has(t.name);
-                        html += `<tr><td>${t.unit}</td><td>${t.title}</td><td>${disp}</td><td>${has ? `<a onclick="router.navigate('teacher_detail',{id:'${t.id}'})" style="cursor:pointer; font-size:1.2em; text-decoration:none;">??</a>` : ''}</td><td>${t.field}</td><td>${t.subject}</td><td>${t.extension}</td></tr>`;
+                        html += `<tr><td>${t.unit}</td><td>${t.title}</td><td>${disp}</td><td>${has ? `<a onclick="router.navigate('teacher_detail',{id:'${t.id}'})" style="cursor:pointer; font-size:1.2em; text-decoration:none;">📅</a>` : ''}</td><td>${t.field}</td><td>${t.subject}</td><td>${t.extension}</td></tr>`;
                     });
                     document.getElementById('main-list-table-area').innerHTML = html + '</tbody></table>';
                 };
 
-                // ?�復?�??                const state = pageStates.teachers;
+                // 恢復狀態
+                const state = pageStates.teachers;
                 const searchInput = document.getElementById('main-list-search');
                 searchInput.value = state.search;
 
-                // ?�出該�??��??��?
+                // 找出該啟用的按鈕
                 const btns = document.querySelectorAll('#page-teachers .nav-btn');
                 let foundBtn = null;
                 btns.forEach(btn => {
@@ -1577,14 +1585,14 @@
                 <div class="container">
                     <div class="global-nav">
                         <div class="nav-links">
-                            <a onclick="router.navigate('index')">?? 首�?</a>
+                            <a onclick="router.navigate('index')">🏠 首頁</a>
                             <span>|</span>
-                            <a onclick="router.navigate('teachers')">?�� ?�師?�表</a>
+                            <a onclick="router.navigate('teachers')">👥 教師列表</a>
                             <span>|</span>
-                            <span class="current">?? ?��??�表</span>
+                            <span class="current">📚 班級列表</span>
                         </div>
                     </div>
-                    <h1 style="color:#0f172a; margin: 0 0 5px 0; font-size: 1.6em;">?? ${(DB?.settings?.schoolName) || ''} ?��??�表清單</h1>
+                    <h1 style="color:#0f172a; margin: 0 0 5px 0; font-size: 1.6em;">📚 ${(DB?.settings?.schoolName) || ''} 班級列表清單</h1>
                     <div id="class-list-content"></div>
                 </div>`;
 
@@ -1592,7 +1600,7 @@
             ensureData(db => {
                 fetchWithCache('getClassList', [], res => {
                     let html = '';[1, 2, 3].forEach(y => {
-                        html += `<div class="grade-section"><div class="grade-title">${y}年�?</div><div class="class-grid">`;
+                        html += `<div class="grade-section"><div class="grade-title">${y}年級</div><div class="class-grid">`;
                         res.classes.filter(c => c.code.startsWith(y)).forEach(c => {
                             const classNum = parseInt(c.code.slice(1)); const isSpecial = classNum > 23; const isDigits3 = /^\d{3}$/.test(c.name);
                             const style = isSpecial ? 'special' : 'standard'; const digitStyle = isDigits3 ? 'digits-3' : '';
@@ -1605,7 +1613,7 @@
         }
 
         let isDetailInit = false; let detailTeachers = []; let currentFilter = { type: 'all', val: '' }; let currentTId = '';
-        const CATS = [{ label: '?�校', type: 'all', val: '' }, { title: '行政?��?' }, { label: '?��???, type: 'unit', val: '?��??? }, { label: '學�???, type: 'unit', val: '學�??? }, { label: '總�???, type: 'unit', val: '總�??? }, { label: '輔�?�?, type: 'unit', val: '輔�?�? }, { title: '年�?導師' }, { label: '一年�?', type: 'unit', val: '一年�?導師' }, { label: '二年�?, type: 'unit', val: '二年級�?�? }, { label: '三年�?, type: 'unit', val: '三年級�?�? }, { title: '?�學?��?' }, { label: '?��?', type: 'sub_chinese', val: '語�?' }, { label: '?��?', type: 'sub_english', val: '?��?' }, { label: '?�學', type: 'field', val: '?�學' }, { label: '?�然', type: 'field', val: '?�然' }, { label: '社�?', type: 'field', val: '社�?' }, { label: '?��?', type: 'field', val: '?��??�人?? }, { label: '?��?', type: 'field', val: '?��?' }, { label: '科�?', type: 'field', val: '科�?' }, { label: '綜�?', type: 'field', val: '綜�?' }];
+        const CATS = [{ label: '全校', type: 'all', val: '' }, { title: '行政單位' }, { label: '教務處', type: 'unit', val: '教務處' }, { label: '學務處', type: 'unit', val: '學務處' }, { label: '總務處', type: 'unit', val: '總務處' }, { label: '輔導室', type: 'unit', val: '輔導室' }, { title: '年級導師' }, { label: '一年級', type: 'unit', val: '一年級導師' }, { label: '二年級', type: 'unit', val: '二年級導師' }, { label: '三年級', type: 'unit', val: '三年級導師' }, { title: '教學領域' }, { label: '國文', type: 'sub_chinese', val: '語文' }, { label: '英語', type: 'sub_english', val: '英語' }, { label: '數學', type: 'field', val: '數學' }, { label: '自然', type: 'field', val: '自然' }, { label: '社會', type: 'field', val: '社會' }, { label: '藝文', type: 'field', val: '藝術與人文' }, { label: '健體', type: 'field', val: '健體' }, { label: '科技', type: 'field', val: '科技' }, { label: '綜合', type: 'field', val: '綜合' }];
 
         function initTeacherDetail(id, skipJump = false) {
             const container = document.getElementById('page-teacher-detail');
@@ -1614,25 +1622,25 @@
                     <div class="col-cats" id="desktop-cats"></div>
                     <div class="col-list">
                         <div class="list-search-box">
-                            <input type="text" id="desktop-search" class="list-search-input" placeholder="?��??�師..." onkeyup="renderDetailList()">
+                            <input type="text" id="desktop-search" class="list-search-input" placeholder="搜尋老師..." onkeyup="renderDetailList()">
                         </div>
                         <div id="desktop-list-body" class="list-scroll-area"></div>
                     </div>
                     <div class="col-main">
                         <div class="global-nav" style="border:none; padding-bottom:5px;">
                             <div class="nav-links">
-                                <a onclick="router.navigate('index')">?? 首�?</a>
+                                <a onclick="router.navigate('index')">🏠 首頁</a>
                                 <span>|</span>
-                                <a onclick="router.navigate('teachers')">?�� ?�師?�表</a>
+                                <a onclick="router.navigate('teachers')">👥 教師列表</a>
                                 <span>|</span>
-                                <a onclick="router.navigate('classes')">?? ?��??�表</a>
+                                <a onclick="router.navigate('classes')">📚 班級列表</a>
                             </div>
                             <div style="display:flex; gap:10px;">
-                                <a id="adj-btn-link" href="#" target="_blank" class="print-btn" style="background:#f59e0b; text-decoration:none;">?��? 調代課系�?/a>
-                                <button onclick="window.print()" class="print-btn">?���??�印課表</button>
+                                <a id="adj-btn-link" href="#" target="_blank" class="print-btn" style="background:#f59e0b; text-decoration:none;">⚙️ 調代課系統</a>
+                                <button onclick="window.print()" class="print-btn">🖨️ 列印課表</button>
                             </div>
                         </div>
-                        <h1 id="teacher-detail-title" style="text-align:center; font-size:1.35em; margin: 2px 0 5px 0; color:#0f172a;">載入�?..</h1>
+                        <h1 id="teacher-detail-title" style="text-align:center; font-size:1.35em; margin: 2px 0 5px 0; color:#0f172a;">載入中...</h1>
                         <div id="teacher-detail-content"></div>
                     </div>
                 </div>`;
@@ -1645,23 +1653,25 @@
                     isDetailInit = true;
                 }
 
-                renderDetailCats(); // 每次?�入?��??�繪?��?�?
-                // ?�復?�是?��??��?濾�???                if (!skipJump) {
+                renderDetailCats(); // 每次進入都要重繪側邊欄
+
+                // 恢復或是初始化過濾狀態
+                if (!skipJump) {
                     const target = db.teachers.find(t => t.id === id);
                     if (target) {
                         let newType = 'all'; let newVal = ''; const subj = target.subject || ''; const field = target.field || '';
-                        if (subj.includes('??)) { newType = 'sub_english'; newVal = '?��?'; } else if (field === '語�?') { newType = 'sub_chinese'; newVal = '語�?'; } else if (field) { newType = 'field'; newVal = field; } else if (target.unit.includes('導師')) { newType = 'unit'; newVal = target.unit; } else if (target.unit.includes('??) || target.unit.includes('�?)) { newType = 'unit'; newVal = target.unit; }
+                        if (subj.includes('英')) { newType = 'sub_english'; newVal = '英語'; } else if (field === '語文') { newType = 'sub_chinese'; newVal = '語文'; } else if (field) { newType = 'field'; newVal = field; } else if (target.unit.includes('導師')) { newType = 'unit'; newVal = target.unit; } else if (target.unit.includes('處') || target.unit.includes('室')) { newType = 'unit'; newVal = target.unit; }
                         currentFilter = { type: newType, val: newVal };
                     }
                 } else {
-                    // ?�是從�?表�??��??��??�試?�復 state
+                    // 若是從列表點回來的，嘗試恢復 state
                     currentFilter.type = pageStates.teacherDetail.filterType || 'all';
                     currentFilter.val = pageStates.teacherDetail.filterVal || '';
                 }
 
                 updateCatActiveState();
 
-                // ?�復?��?字串
+                // 恢復搜尋字串
                 const searchInput = document.getElementById('desktop-search');
                 if (searchInput) searchInput.value = pageStates.teacherDetail.search || '';
 
@@ -1685,7 +1695,7 @@
         function renderDetailList() {
             const div = document.getElementById('desktop-list-body'); const search = document.getElementById('desktop-search').value.toLowerCase();
             const filtered = detailTeachers.filter(t => {
-                let matchF = false; if (currentFilter.type === 'all') matchF = true; else if (currentFilter.type === 'sub_english') matchF = (t.subject || '').includes('??); else if (currentFilter.type === 'sub_chinese') matchF = (t.field === '語�?') && !(t.subject || '').includes('??); else if (currentFilter.type === 'field') matchF = (t.field || '').includes(currentFilter.val) || (t.subject || '').includes(currentFilter.val); else matchF = t[currentFilter.type] === currentFilter.val; return matchF && t.name.toLowerCase().includes(search);
+                let matchF = false; if (currentFilter.type === 'all') matchF = true; else if (currentFilter.type === 'sub_english') matchF = (t.subject || '').includes('英'); else if (currentFilter.type === 'sub_chinese') matchF = (t.field === '語文') && !(t.subject || '').includes('英'); else if (currentFilter.type === 'field') matchF = (t.field || '').includes(currentFilter.val) || (t.subject || '').includes(currentFilter.val); else matchF = t[currentFilter.type] === currentFilter.val; return matchF && t.name.toLowerCase().includes(search);
             });
             let html = ''; filtered.forEach(t => { const disp = getDisplayName(t, DB.settings, DB.isInternalEmail); const tagLabel = t.subject || t.field || ''; html += `<div class="list-item" id="list-item-${t.id}" onclick="onTeacherClick('${t.id}')"><div class="t-name-row">${disp}</div><div class="t-tags-row"><span class="t-tag">${t.title}</span><span class="t-tag blue">${tagLabel}</span></div></div>`; });
             div.innerHTML = html; highlightList(currentTId);
@@ -1698,9 +1708,9 @@
             fetchWithCache('getTeacherTimetable', [id], res => {
                 if (!res) return;
                 const disp = getDisplayName({ name: res.teacherName, maskedName: res.maskedName }, res.settings, res.isInternalEmail);
-                document.getElementById('teacher-detail-title').textContent = '?�師課表�? + disp;
-                let html = '<div class="timetable-table-wrap"><table class="timetable-table"><thead><tr><th class="period-label">節�?/th><th>?��?</th><th>?��?</th><th>?��?</th><th>?��?</th><th>?��?</th></tr></thead><tbody>';
-                for (let p = 0; p <= 8; p++) { html += `<tr><td class="period-label">${p === 0 ? '?�自�? : p}</td>`; for (let d = 1; d <= 5; d++) { const c = (res.timetable[d] && res.timetable[d][p]) ? res.timetable[d][p] : null; if (c) { html += `<td><div class="subject-name">${c.subjectName}</div><a onclick="router.navigate('class_detail',{code:'${c.classCode}'})" class="link-text">${c.className}</a></td>`; } else html += '<td></td>'; } html += '</tr>'; }
+                document.getElementById('teacher-detail-title').textContent = '教師課表：' + disp;
+                let html = '<div class="timetable-table-wrap"><table class="timetable-table"><thead><tr><th class="period-label">節次</th><th>週一</th><th>週二</th><th>週三</th><th>週四</th><th>週五</th></tr></thead><tbody>';
+                for (let p = 0; p <= 8; p++) { html += `<tr><td class="period-label">${p === 0 ? '早自修' : p}</td>`; for (let d = 1; d <= 5; d++) { const c = (res.timetable[d] && res.timetable[d][p]) ? res.timetable[d][p] : null; if (c) { html += `<td><div class="subject-name">${c.subjectName}</div><a onclick="router.navigate('class_detail',{code:'${c.classCode}'})" class="link-text">${c.className}</a></td>`; } else html += '<td></td>'; } html += '</tr>'; }
                 document.getElementById('teacher-detail-content').innerHTML = html + '</tbody></table></div>';
             }, 'TT_' + id);
         }
@@ -1712,24 +1722,24 @@
                 <div class="detail-wrapper">
                     <div class="col-class-nav">
                         <div class="class-tabs">
-                            <div class="class-tab" onclick="switchClassTab('1', this)">一年�?</div>
-                            <div class="class-tab" onclick="switchClassTab('2', this)">二年�?/div>
-                            <div class="class-tab" onclick="switchClassTab('3', this)">三年�?/div>
+                            <div class="class-tab" onclick="switchClassTab('1', this)">一年級</div>
+                            <div class="class-tab" onclick="switchClassTab('2', this)">二年級</div>
+                            <div class="class-tab" onclick="switchClassTab('3', this)">三年級</div>
                         </div>
                         <div id="class-matrix-body" class="class-columns-container"></div>
                     </div>
                     <div class="col-main">
                         <div class="global-nav" style="border:none; padding-bottom:5px;">
                             <div class="nav-links">
-                                <a onclick="router.navigate('index')">?? 首�?</a>
+                                <a onclick="router.navigate('index')">🏠 首頁</a>
                                 <span>|</span>
-                                <a onclick="router.navigate('teachers')">?�� ?�師?�表</a>
+                                <a onclick="router.navigate('teachers')">👥 教師列表</a>
                                 <span>|</span>
-                                <a onclick="router.navigate('classes')">?? ?��??�表</a>
+                                <a onclick="router.navigate('classes')">📚 班級列表</a>
                             </div>
-                            <button onclick="window.print()" class="print-btn">?���??�印課表</button>
+                            <button onclick="window.print()" class="print-btn">🖨️ 列印課表</button>
                         </div>
-                        <h1 id="class-detail-title" style="text-align:center; font-size:1.35em; margin: 2px 0 5px 0; color:#0f172a;">載入�?..</h1>
+                        <h1 id="class-detail-title" style="text-align:center; font-size:1.35em; margin: 2px 0 5px 0; color:#0f172a;">載入中...</h1>
                         <div id="class-detail-content"></div>
                     </div>
                 </div>`;
@@ -1766,9 +1776,9 @@
         function renderClassTimetable(code) {
             fetchWithCache('getClassTimetable', [code], res => {
                 if (!res) return;
-                document.getElementById('class-detail-title').textContent = '?��?課表�? + res.className;
-                let html = '<div class="timetable-table-wrap"><table class="timetable-table"><thead><tr><th class="period-label">節�?/th><th>?��?</th><th>?��?</th><th>?��?</th><th>?��?</th><th>?��?</th></tr></thead><tbody>';
-                for (let p = 0; p <= 8; p++) { html += `<tr><td class="period-label">${p === 0 ? '?�自�? : p}</td>`; for (let d = 1; d <= 5; d++) { const c = (res.timetable[d] && res.timetable[d][p]) ? res.timetable[d][p] : null; if (c) { const disp = getDisplayName(c, res.settings, res.isInternalEmail); html += `<td><div class="subject-name">${c.subjectName}</div><a onclick="router.navigate('teacher_detail',{id:'${c.teacherId}'})" class="link-text">${disp}</a></td>`; } else html += '<td></td>'; } html += '</tr>'; }
+                document.getElementById('class-detail-title').textContent = '班級課表：' + res.className;
+                let html = '<div class="timetable-table-wrap"><table class="timetable-table"><thead><tr><th class="period-label">節次</th><th>週一</th><th>週二</th><th>週三</th><th>週四</th><th>週五</th></tr></thead><tbody>';
+                for (let p = 0; p <= 8; p++) { html += `<tr><td class="period-label">${p === 0 ? '早自修' : p}</td>`; for (let d = 1; d <= 5; d++) { const c = (res.timetable[d] && res.timetable[d][p]) ? res.timetable[d][p] : null; if (c) { const disp = getDisplayName(c, res.settings, res.isInternalEmail); html += `<td><div class="subject-name">${c.subjectName}</div><a onclick="router.navigate('teacher_detail',{id:'${c.teacherId}'})" class="link-text">${disp}</a></td>`; } else html += '<td></td>'; } html += '</tr>'; }
                 document.getElementById('class-detail-content').innerHTML = html + '</tbody></table></div>';
             }, 'CLASS_TT_' + code);
         }
@@ -1777,4 +1787,3 @@
 </body>
 
 </html>
-
