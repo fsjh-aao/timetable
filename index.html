@@ -9,11 +9,75 @@
     // [IMPORTANT] API Endpoint
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbySt-5WOOMa6B3Wh8H3Wk4pc8jyjzBVNfcklXDzTRWv7wXTbG86Jl2frDTclCMTOz1-/exec";
 
-    // Polyfill for google.script.run
+    // Polyfill for google.script.run to support chaining
     window.google = window.google || {};
     window.google.script = window.google.script || {};
 
-    // Mock History
+    const createRunner = (successHandler, failureHandler) => {
+        const chain = {
+            withSuccessHandler: (f) => createRunner(f, failureHandler),
+            withFailureHandler: (f) => createRunner(successHandler, f)
+        };
+
+        return new Proxy(chain, {
+            get: (target, prop) => {
+                if (prop in target) return target[prop];
+                return (...args) => executeApi(prop, args, successHandler, failureHandler);
+            }
+        });
+    };
+
+    function executeApi(funcName, args, onSuccess, onFailure) {
+        console.log(`[API Call] ${funcName}`, args);
+
+        if (funcName === "getFullSystemSync") {
+            // Local Cache Check
+            const localData = localStorage.getItem("FSJH_FULL_SYNC");
+            let usedCache = false;
+            if (localData) {
+                try {
+                    const parsed = JSON.parse(localData);
+                    if (new Date().getTime() - parsed.timestamp < 3600000) { // 1 Hour Cache
+                        console.log("[API] Using Local Cache");
+                        if (onSuccess) onSuccess(parsed.data);
+                        usedCache = true;
+                    }
+                } catch (e) { localStorage.removeItem("FSJH_FULL_SYNC"); }
+            }
+
+            // Network Fetch
+            fetch(GAS_API_URL + "?api=true")
+                .then(res => {
+                    if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+                    return res.json();
+                })
+                .then(data => {
+                    console.log("[API] Fresh Data Received");
+                    localStorage.setItem("FSJH_FULL_SYNC", JSON.stringify({
+                        timestamp: new Date().getTime(),
+                        data: data
+                    }));
+
+                    // Only invoke callback if we haven't used cache, OR if we want to update UI live.
+                    // To strictly match GAS behavior (one callback), we usually only call once.
+                    // But here we want 'stale-while-revalidate' strategy.
+                    // If usedCache is true, we might skip, OR call again to refresh.
+                    // For now, let's call it again to ensure fresh data is shown.
+                    if (onSuccess) onSuccess(data);
+                })
+                .catch(err => {
+                    console.error("[API] Fetch Error:", err);
+                    if (onFailure) onFailure(err);
+                });
+        } else {
+            console.warn(`Function ${funcName} is not supported in Adapter mode.`);
+        }
+    }
+
+    // Initialize the runner
+    window.google.script.run = createRunner(null, null);
+
+    // Mock History (keeps URL clean)
     window.google.script.history = {
         push: function (state, params, hash) {
             console.log("[History] Push:", state, params, hash);
@@ -28,71 +92,6 @@
                 const params = {};
                 new URL(window.location).searchParams.forEach((v, k) => params[k] = v);
                 callback({ location: { parameter: params } });
-            });
-        }
-    };
-
-    // Mock Run
-    window.google.script.run = {
-        withFailureHandler: function (callback) {
-            this.failureHandler = callback;
-            return this;
-        },
-        withSuccessHandler: function (callback) {
-            return new Proxy({}, {
-                get: function (target, prop) {
-                    return function (...args) {
-                        console.log("[API Call] " + prop, args);
-
-                        if (prop === "getFullSystemSync") {
-                            // Check Local Cache First (Speedup)
-                            const localData = localStorage.getItem("FSJH_FULL_SYNC");
-                            let usedCache = false;
-
-                            if (localData) {
-                                try {
-                                    const parsed = JSON.parse(localData);
-                                    // 1 hour cache validity for initial load speedup
-                                    if (new Date().getTime() - parsed.timestamp < 3600000) {
-                                        console.log("[API] Using Local Cache");
-                                        callback(parsed.data);
-                                        usedCache = true;
-                                    }
-                                } catch (e) { localStorage.removeItem("FSJH_FULL_SYNC"); }
-                            }
-
-                            // Fetch Fresh Data
-                            fetch(GAS_API_URL + "?api=true")
-                                .then(res => res.json())
-                                .then(data => {
-                                    console.log("[API] Fresh Data Received");
-                                    // Update Cache
-                                    localStorage.setItem("FSJH_FULL_SYNC", JSON.stringify({
-                                        timestamp: new Date().getTime(),
-                                        data: data
-                                    }));
-
-                                    // If we didn't use cache, or if data is newer, call callback
-                                    // Note: If usedCache is true, we might want to refresh UI silently or notify user
-                                    if (!usedCache) {
-                                        callback(data);
-                                    } else {
-                                        console.log("[API] Background update completed");
-                                        // Optional: Call callback again to update UI with fresh data if needed
-                                        // callback(data); 
-                                    }
-                                })
-                                .catch(err => {
-                                    console.error("[API] Error:", err);
-                                    if (window.google.script.run.failureHandler) {
-                                        window.google.script.run.failureHandler(err);
-                                    }
-                                });
-                        } else {
-                            console.warn("Function " + prop + " is not supported in API mode or should be handled locally.");
-                        }
-                    }
-                }
             });
         }
     };
