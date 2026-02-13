@@ -4,15 +4,19 @@
 <head>
     <base target="_top">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>課表查詢系統</title>
+    <!-- Fonts -->
     <link
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&family=Noto+Sans+TC:wght@300;400;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <!-- GAS API Configuration -->
     <script>
-        const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbzdYrT6ES4E5Pz9uI2QfvP7RHkBsf_lVUNO3NB1EXdPqHTFZxbpoUuIN_aiefx7VmUt/exec'; // Deployment ID @71
+        // [IMPORTANT] This ID points to the original GAS project script
+        const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbzdYrT6ES4E5Pz9uI2QfvP7RHkBsf_lVUNO3NB1EXdPqHTFZxbpoUuIN_aiefx7VmUt/exec';
 
-        // Mock google.script.run
+        // Mock google.script.run for compatibility
         window.google = window.google || {};
         window.google.script = window.google.script || {};
 
@@ -21,27 +25,23 @@
                 return new Proxy({}, {
                     get: function (target, prop) {
                         return function (...args) {
-                            console.log(`[API Call] ${prop}`, args);
-
-                            // Only getFullSystemSync is strictly needed for the initial load
-                            // All other data processing happens locally in the frontend cache logic usually
+                            console.log(`[Adapter] Call: ${prop}`, args);
                             if (prop === 'getFullSystemSync') {
+                                // Real network call
                                 fetch(`${GAS_API_URL}?api=true`)
                                     .then(res => res.json())
                                     .then(data => {
-                                        console.log('[API Data]', data);
+                                        console.log('[Adapter] Data Received', data);
                                         callback(data);
                                     })
                                     .catch(err => {
-                                        console.error('API Error:', err);
-                                        if (window.google.script.run.failureHandler) {
-                                            window.google.script.run.failureHandler(err);
-                                        }
+                                        console.error('[Adapter] Error', err);
+                                        if (window.google.script.run.failureHandler) window.google.script.run.failureHandler(err);
                                     });
                             } else {
-                                console.warn(`[Mock] Function ${prop} not implemented in API mode, or handled locally.`);
-                                // For other functions, we might need to implement specific handlers if the logic isn't fully local
-                                // But based on the code analysis, most logic relies on the initial DB sync.
+                                console.warn(`[Adapter] Function ${prop} should be handled locally.`);
+                                // If some function slips through local cache, we ignore it here 
+                                // because we rewritten fetchWithCache to handle everything locally.
                             }
                         }
                     }
@@ -53,23 +53,24 @@
             }
         };
 
-        // History API Mock
         window.google.script.history = {
-            push: function (state, params, hash) {
-                console.log('[History] push', state, params, hash);
-                // Update URL hash without reloading
-                if (hash) window.location.hash = hash;
+            push: function (s, p, page) {
+                const url = new URL(window.location);
+                url.searchParams.set('page', page);
+                if (p) Object.keys(p).forEach(k => url.searchParams.set(k, p[k]));
+                window.history.pushState(s, '', url);
             },
-            setChangeHandler: function (callback) {
-                window.addEventListener('popstate', callback);
+            setChangeHandler: function (cb) {
+                window.addEventListener('popstate', () => {
+                    const params = {};
+                    new URL(window.location).searchParams.forEach((val, key) => params[key] = val);
+                    cb({ location: { parameter: params } });
+                });
             }
         };
     </script>
 
-    <!-- Original Styles.html Content -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Styles Merged -->
     <style>
         :root {
             --primary-color: #2980b9;
@@ -80,378 +81,29 @@
             --text-color: #3c4043;
             --subtle-gray: #dcdde1;
             --tt-header-bg: #dfe6e9;
+
+            /* v6.1 Theme */
+            --brand-primary: #2563eb;
+            --brand-dark: #0f172a;
+            --brand-light: #eff6ff;
+            --glass-bg: rgba(255, 255, 255, 0.88);
+            --glass-border: rgba(255, 255, 255, 0.5);
         }
 
-        /* 核心修正：徹底封印 Chrome 的 Font Boosting (這是停頓一秒後卡住的主因) */
         html,
         body {
             -webkit-text-size-adjust: none !important;
             text-size-adjust: none !important;
             margin: 0;
             padding: 0;
-            background-color: var(--bg-color);
-        }
-
-        body {
-            font-family: 'Noto Sans TC', sans-serif;
-            color: var(--text-color);
-            font-size: 15px;
-            /* 移除之前所有會增加 Chrome 負擔的動畫與手勢限制 */
-        }
-
-        .container {
-            max-width: 1000px;
-            margin: 10px auto;
-            padding: 12px 25px;
-            background-color: var(--surface-color);
-            border-radius: 12px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-        }
-
-        .global-nav {
-            min-height: 40px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 8px;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .nav-links a {
-            text-decoration: none;
-            color: var(--primary-color);
-            font-weight: 500;
-            cursor: pointer;
-        }
-
-        .nav-links span {
-            color: #ddd;
-        }
-
-        h1 {
-            color: var(--secondary-color);
-            font-size: 1.5em;
-            font-weight: 700;
-            margin-bottom: 10px;
-            margin-top: 0;
-        }
-
-        .nav-btn {
-            background-color: var(--surface-color);
-            color: var(--primary-color);
-            border: 1.5px solid var(--primary-color);
-            padding: 5px 15px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 1.05em;
-            font-weight: 500;
-        }
-
-        .nav-btn.active,
-        .nav-btn:hover {
-            background-color: var(--primary-color);
-            color: white;
-        }
-
-        .search-box {
-            display: flex;
-            align-items: center;
-            border: 1px solid #ccc;
-            border-radius: 20px;
-            padding: 2px 12px;
-            background: white;
-        }
-
-        .search-input {
-            border: none;
-            outline: none;
-            padding: 5px 0;
-            width: 110px;
-            font-size: 0.9em;
-        }
-
-        .staff-count-label {
-            font-size: 0.95em;
-            color: var(--secondary-color);
-            background-color: #f8f9fa;
-            padding: 4px 15px;
-            border-radius: 15px;
-            border: 1px solid #ddd;
-            font-weight: 500;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: center;
-        }
-
-        th,
-        td {
-            padding: 6px 8px;
-            border: 1px solid #ddd;
-            text-align: center !important;
-        }
-
-        th {
-            background-color: var(--secondary-color) !important;
-            color: #ffffff !important;
-            font-weight: 500;
-        }
-
-        tr:nth-child(even) {
-            background-color: #f9fbfd;
-        }
-
-        .timetable-table-wrap {
-            width: 100%;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .timetable-table {
-            width: 720px;
-            margin: 0 auto;
-            table-layout: fixed;
-            border: 2px solid #2c3e50;
-        }
-
-        .timetable-table th {
-            background: var(--tt-header-bg) !important;
-            color: #000 !important;
-            font-weight: 700;
-            height: 38px;
-            border: 1.5px solid #2c3e50;
-        }
-
-        .timetable-table td {
-            height: 52px;
-            padding: 2px !important;
-            border: 1px solid #999999;
-        }
-
-        .period-label {
-            background-color: #ebf2f6 !important;
-            font-weight: bold;
-            width: 70px;
-            color: #2c3e50 !important;
-            border-right: 2px solid #2c3e50 !important;
-        }
-
-        .subject-name {
-            font-weight: 700;
-            color: #000;
-            font-size: 1.1em;
-            line-height: 1.2;
-            display: block;
-        }
-
-        .link-text {
-            color: var(--accent-color);
-            text-decoration: none;
-            font-size: 0.85em;
-            font-weight: 500;
-            display: block;
-            cursor: pointer;
-        }
-
-        .print-btn {
-            background: #34495e;
-            color: white;
-            border: none;
-            padding: 4px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.85em;
-        }
-
-        .toast-msg {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(44, 62, 80, 0.9);
-            color: white;
-            padding: 12px 25px;
-            border-radius: 30px;
-            z-index: 9999;
-            display: none;
-            font-weight: bold;
-        }
-
-        .site-footer {
-            text-align: center;
-            font-size: 0.75rem;
-            color: #94a3b8;
-            padding: 15px 0;
-            width: 100%;
-            margin-top: auto;
-            line-height: 1.6;
-        }
-
-        @media print {
-
-            .global-nav,
-            .print-btn,
-            .nav-btn,
-            .search-box,
-            .staff-count-label,
-            .toast-msg,
-            .no-print {
-                display: none !important;
-            }
-
-            .container {
-                box-shadow: none !important;
-                border: none !important;
-                width: 100% !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-
-            .timetable-table {
-                width: 95% !important;
-                border: 1.5px solid black !important;
-            }
-
-            th,
-            td {
-                border: 1px solid black !important;
-                color: black !important;
-            }
-        }
-    </style>
-    <div id="toast" class="toast-msg"></div>
-    <script>
-        function showToast(msg) {
-            const toast = document.getElementById('toast'); toast.textContent = msg; toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 3000);
-        }
-
-        let clientIP = "";
-        async function getUserIP() {
-            if (clientIP) return clientIP;
-            try {
-                const res = await fetch('https://api.ipify.org?format=json');
-                const data = await res.json();
-                clientIP = data.ip;
-                return clientIP;
-            } catch (e) { return ""; }
-        }
-
-        function getDisplayName(t, settings, isInternalEmail) {
-            if (!t) return "";
-            const mode = settings ? (settings.mode || 'OFF') : 'OFF';
-            const name = t.name || t.teacher || "";
-            let maskedName = t.maskedName || t.maskedTeacher || "";
-            if (!maskedName && name) maskedName = (name.length > 0) ? name[0] + '老師' : name;
-            if (mode === 'ALL') return maskedName;
-            if (mode === 'OFF') return name;
-            if (isInternalEmail) return name;
-            if (clientIP && settings.allowedIp && clientIP.startsWith(settings.allowedIp)) return name;
-            return maskedName;
-        }
-
-        const FECache = {
-            TTL: 3600 * 1000 * 6,
-            set: function (key, data) {
-                const cacheObj = { timestamp: new Date().getTime(), data: data };
-                localStorage.setItem('FSJH_FE_' + key, JSON.stringify(cacheObj));
-            },
-            get: function (key) {
-                const raw = localStorage.getItem('FSJH_FE_' + key);
-                if (!raw) return null;
-                try {
-                    const cacheObj = JSON.parse(raw);
-                    const now = new Date().getTime();
-                    if (now - cacheObj.timestamp > this.TTL) cacheObj.stale = true;
-                    return cacheObj;
-                } catch (e) { return null; }
-            },
-            getDB: function () {
-                const sync = this.get('FULL_SYNC');
-                return sync ? sync.data : null;
-            },
-            clear: function () {
-                Object.keys(localStorage).forEach(key => { if (key.startsWith('FSJH_FE_')) localStorage.removeItem(key); });
-            }
-        };
-
-        function fetchWithCache(funcName, args, callback, cacheKey) {
-            // [MODIFIED] Use simulated caching logic for GitHub Pages
-            const db = FECache.getDB();
-
-            // If DB exists, handle locally
-            if (db) {
-                let localResult = null;
-                if (funcName === 'getTeacherData') {
-                    const scheduledTeachers = new Set(db.schedules.map(r => r.tname));
-                    localResult = { success: true, teachers: db.teachers.map(t => ({ ...t, hasSchedule: scheduledTeachers.has(t.name) })), settings: db.settings, isInternalEmail: db.isInternalEmail };
-                } else if (funcName === 'getClassList') {
-                    const classStats = new Map();
-                    db.schedules.forEach(row => {
-                        if (!classStats.has(row.classCode)) classStats.set(row.classCode, { count: 0, hasCore: false, name: row.className });
-                        const stat = classStats.get(row.classCode);
-                        stat.count++;
-                        if (parseInt(row.period) >= 1 && parseInt(row.period) <= 7) stat.hasCore = true;
-                    });
-                    localResult = { success: true, classes: Array.from(classStats.entries()).filter(([code, stat]) => stat.count > 3 && stat.hasCore).map(([code, stat]) => ({ code, name: stat.name })).sort((a, b) => a.code.localeCompare(b.code)) };
-                } else if (funcName === 'getTeacherTimetable') {
-                    const id = args[0]; const rows = db.schedules.filter(row => row.tid === id);
-                    const timetable = {}; let realName = "";
-                    rows.forEach(row => {
-                        if (!timetable[row.day]) timetable[row.day] = {}; if (!realName) realName = row.tname;
-                        timetable[row.day][row.period] = { subjectName: row.subjectName, subjectCode: row.subjectCode, className: row.className, classCode: row.classCode };
-                    });
-                    const masked = (rows.length > 0) ? (rows[0].maskedTeacher || rows[0].tname) : "";
-                    localResult = { success: true, timetable, teacherName: realName, maskedName: masked, settings: db.settings, isInternalEmail: db.isInternalEmail };
-                } else if (funcName === 'getClassTimetable') {
-                    const classCode = args[0]; const classRows = db.schedules.filter(row => row.classCode === classCode);
-                    const timetable = {};
-                    classRows.forEach(row => {
-                        if (!timetable[row.day]) timetable[row.day] = {};
-                        timetable[row.day][row.period] = { subjectName: row.subjectName, teacher: row.tname, maskedTeacher: row.maskedTeacher || row.tname, teacherId: row.tid };
-                    });
-                    localResult = { success: true, timetable, className: classRows.length > 0 ? classRows[0].className : classCode, settings: db.settings, isInternalEmail: db.isInternalEmail };
-                }
-                if (localResult) { callback(localResult, true); return; }
-            }
-
-            // If not in cache or operation not supported locally, fallback to API
-            // In this ported version, effectively only 'getFullSystemSync' goes to network
-            if (funcName === 'getFullSystemSync' || !db) {
-                console.log('[Adapter] Fetching system data...');
-                window.google.script.run.withSuccessHandler(res => {
-                    if (res) { FECache.set('FULL_SYNC', res); callback(res, false); }
-                }).getFullSystemSync();
-            } else {
-                console.warn('[Adapter] Operation not supported without full sync:', funcName);
-            }
-        }
-    </script>
-
-    <!-- Index.html CSS (Merged) -->
-    <style>
-        /* 全局重置與基礎設定 */
-        body {
-            margin: 0;
-            padding: 0;
             background-color: #f8fafc;
+            font-family: 'Plus Jakarta Sans', 'Noto Sans TC', sans-serif;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
-            min-height: 100vh;
-            font-family: 'Plus Jakarta Sans', 'Noto Sans TC', sans-serif;
-            overflow-x: hidden;
-            /* Prevent horizontal scroll */
         }
 
+        /* Layout & Components */
         .page-view {
             display: none;
             width: 100%;
@@ -462,60 +114,448 @@
             display: block;
         }
 
-        /* 移除 Iframe 專用 hack */
-        .detail-wrapper {
+        .container {
             max-width: 1200px;
-            margin: 5px auto;
-            height: auto;
-            /* Let it grow naturally */
-            min-height: 80vh;
-            background: #f0f3f5;
-            display: flex;
-            gap: 12px;
+            margin: 10px auto;
+            padding: 15px 30px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
         }
-
-        /* 其他保持原樣，但針對 GitHub Pages 環境微調 */
-        /* ... (Index.html styles simplified for brevity, assuming standard CSS handling) ... */
-        /* Note: For the actual file, I'm pasting the critical structural CSS from Index.html */
 
         .global-nav {
             display: flex;
             justify-content: space-between;
-            padding: 10px 20px;
-            background: white;
+            align-items: center;
             margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f1f5f9;
         }
 
+        .nav-links {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #3b82f6;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .nav-links span {
+            color: #ddd;
+        }
+
+        .nav-links .current {
+            color: #94a3b8;
+            pointer-events: none;
+            font-weight: bold;
+        }
+
+        /* Home Styles */
         .home-hero {
-            height: 300px;
+            height: 320px;
             background: linear-gradient(135deg, #1e40af, #0f172a);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            text-align: center;
+            margin-bottom: 40px;
+            clip-path: ellipse(150% 100% at 50% 0%);
+        }
+
+        .home-title {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin: 0;
+        }
+
+        .home-subtitle {
+            margin-top: 10px;
+            font-size: 1.15rem;
+            opacity: 0.85;
+        }
+
+        .home-grid {
+            max-width: 950px;
+            margin: -90px auto 60px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            padding: 0 20px;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            border-radius: 28px;
+            padding: 35px 25px;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+        }
+
+        .card-icon {
+            width: 70px;
+            height: 70px;
+            background: #eff6ff;
+            color: #2563eb;
+            border-radius: 18px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            color: #0f172a;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .card-desc {
+            color: #64748b;
+        }
+
+        /* Buttons & Inputs */
+        .nav-btn {
+            background: #fff;
+            color: #3b82f6;
+            border: 1.5px solid #3b82f6;
+            padding: 4px 10px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.95em;
+            white-space: nowrap;
+        }
+
+        .nav-btn.active,
+        .nav-btn:hover {
+            background: #3b82f6;
             color: white;
+        }
+
+        .nav-rows-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .nav-row {
+            display: flex;
+            gap: 4px;
+            overflow-x: auto;
+            padding-bottom: 2px;
+        }
+
+        .teacher-search-box {
+            display: flex;
+            align-items: center;
+            border: 1px solid #cbd5e1;
+            border-radius: 20px;
+            padding: 0 10px;
+            background: white;
+            height: 32px;
+        }
+
+        .teacher-search-input {
+            border: none;
+            outline: none;
+            margin-left: 6px;
+            font-size: 0.9em;
+            width: 120px;
+        }
+
+        /* Table Styles */
+        .teacher-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .teacher-table th {
+            background: #f1f5f9;
+            padding: 10px;
+            color: #475569;
+        }
+
+        .teacher-table td {
+            border-bottom: 1px solid #f1f5f9;
+            padding: 10px;
+            color: #1e293b;
+        }
+
+        .teacher-table tr:hover {
+            background: #f8fafc;
+        }
+
+        /* Timetable */
+        .timetable-table {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            border-collapse: collapse;
+            border: 2px solid #0f172a;
+            table-layout: fixed;
+        }
+
+        .timetable-table th {
+            background: #f1f5f9;
+            border: 1px solid #0f172a;
+            height: 40px;
+        }
+
+        .timetable-table td {
+            border: 1px solid #cbd5e1;
+            height: 50px;
+            text-align: center;
+            vertical-align: middle;
+            padding: 2px;
+        }
+
+        .period-label {
+            background: #ebf2f6;
+            width: 60px;
+            font-weight: bold;
+        }
+
+        .subject-name {
+            font-weight: 700;
+            display: block;
+            font-size: 1.1em;
+        }
+
+        .link-text {
+            color: #3b82f6;
+            font-size: 0.9em;
+            cursor: pointer;
+            display: block;
+        }
+
+        .timetable-table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Detail Layout */
+        .detail-wrapper {
+            display: flex;
+            gap: 12px;
+            margin: 10px auto;
+            max-width: 1200px;
+        }
+
+        .col-cats {
+            width: 104px;
+            flex-shrink: 0;
+            background: #0f172a;
+            color: #f1f5f9;
+            border-radius: 12px;
+            padding: 10px 0;
+        }
+
+        .cat-btn {
+            padding: 8px 15px;
+            cursor: pointer;
+            font-size: 1.05em;
+            border-left: 4px solid transparent;
+        }
+
+        .cat-btn.active {
+            background: #1e293b;
+            border-left-color: #3b82f6;
+            font-weight: bold;
+        }
+
+        .cat-group {
+            padding: 5px 15px;
+            font-size: 0.75em;
+            color: #64748b;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .col-list {
+            width: 220px;
+            flex-shrink: 0;
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 100px);
+        }
+
+        .list-search-box {
+            padding: 10px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .list-search-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .list-scroll-area {
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .list-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f8fafc;
+        }
+
+        .list-item:hover {
+            background: #f1f5f9;
+        }
+
+        .list-item.active {
+            background: #eff6ff;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .col-main {
+            flex-grow: 1;
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        /* Class Grid */
+        .class-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 8px;
+        }
+
+        .class-btn {
+            border: 1px solid #e2e8f0;
+            padding: 8px;
+            border-radius: 6px;
+            text-align: center;
+            cursor: pointer;
+            background: #f0f9ff;
+            color: #0369a1;
+            font-weight: 500;
+        }
+
+        .class-btn.active {
+            background: #0369a1;
+            color: white;
+        }
+
+        .grade-section {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #f1f5f9;
+        }
+
+        .grade-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            border-left: 4px solid #3b82f6;
+            padding-left: 8px;
+        }
+
+        .col-class-nav {
+            width: 200px;
+            flex-shrink: 0;
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .class-tabs {
+            display: flex;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .class-tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            cursor: pointer;
+            background: #f8fafc;
+        }
+
+        .class-tab.active {
+            background: white;
+            border-bottom: 2px solid #3b82f6;
+            font-weight: bold;
+        }
+
+        .class-btn-mini {
+            padding: 6px;
+            margin: 4px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .class-btn-mini:hover {
+            background: #f1f5f9;
+        }
+
+        .class-btn-mini.active {
+            bg: #eff6ff;
+            color: #2563eb;
+            font-weight: bold;
+        }
+
+        /* Loader */
+        #app-loader {
+            position: fixed;
+            inset: 0;
+            background: #0f172a;
+            z-index: 9999;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            margin-bottom: 40px;
+            color: white;
+            transition: opacity 0.5s;
         }
 
-        .home-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #334155;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
 
-        .feature-card {
-            background: white;
-            padding: 30px;
-            border-radius: 20px;
-            text-align: center;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            cursor: pointer;
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
         }
 
-        /* Responsive Fixes for Mobile */
+        /* Media Queries */
         @media (max-width: 768px) {
             .detail-wrapper {
                 flex-direction: column;
@@ -526,264 +566,534 @@
             .col-class-nav {
                 width: 100%;
                 height: auto;
-                max-height: 200px;
+                max-height: 180px;
             }
 
-            .timetable-table {
-                width: 100%;
-                font-size: 0.8em;
+            .col-main {
+                padding: 10px;
+            }
+
+            .timetable-table th,
+            .timetable-table td {
+                padding: 2px;
+                font-size: 0.85em;
+            }
+
+            .container {
+                padding: 10px;
+            }
+        }
+
+        @media print {
+
+            .global-nav,
+            .col-cats,
+            .col-list,
+            .col-class-nav,
+            .print-btn,
+            .home-hero {
+                display: none !important;
+            }
+
+            .col-main,
+            .container {
+                width: 100% !important;
+                border: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+            }
+
+            .detail-wrapper {
+                display: block !important;
             }
         }
     </style>
 </head>
 
 <body>
-    <!-- 轉場動畫層 -->
-    <div id="transition-loader">
-        <div class="dot-pulse">
-            <div class="pulse-dot"></div>
-            <div class="pulse-dot"></div>
-            <div class="pulse-dot"></div>
-        </div>
+    <!-- Loading Screen -->
+    <div id="app-loader">
+        <div class="spinner"></div>
+        <div style="margin-top:20px; font-weight:bold;">系統載入中...</div>
+        <div style="font-size:0.8em; color:#94a3b8; margin-top:5px;">正在同步最新課表資料</div>
     </div>
 
-    <!-- 首頁 (Index) -->
-    <div id="page-index" class="page-view active">
-        <div class="home-hero">
-            <h1 class="home-title">課表查詢系統</h1>
-            <p class="home-subtitle">快速查詢教師與班級課表</p>
-        </div>
-
-        <div class="home-grid">
-            <div class="feature-card" onclick="router.navigate('teachers')">
-                <div class="card-icon"><i class="fa-solid fa-chalkboard-user"></i></div>
-                <h3 class="card-title">教師查詢</h3>
-                <p class="card-desc">查看教師個人課表</p>
+    <!-- App Container -->
+    <div id="app">
+        <!-- Index Page -->
+        <div id="page-index" class="page-view active">
+            <div class="home-hero">
+                <h1 class="home-title" id="home-school-name">課表查詢系統</h1>
+                <div class="home-subtitle">智慧、即時、精準的校園課務核心平台</div>
             </div>
-            <div class="feature-card" onclick="router.navigate('classes')">
-                <div class="card-icon"><i class="fa-solid fa-users"></i></div>
-                <h3 class="card-title">班級查詢</h3>
-                <p class="card-desc">查看各班級課程表</p>
-            </div>
-        </div>
-
-        <footer class="site-footer">
-            <p>© 2024 GAS 課表系統</p>
-        </footer>
-    </div>
-
-    <!-- 教師列表 (Teachers) -->
-    <div id="page-teachers" class="page-view">
-        <div class="container">
-            <div class="global-nav">
-                <div class="nav-links">
-                    <a onclick="router.navigate('index')">首頁</a>
-                    <span>/</span>
-                    <span class="current">教師列表</span>
+            <div class="home-grid">
+                <div class="feature-card" onclick="router.navigate('teachers')">
+                    <div class="card-icon"><i class="fa-solid fa-chalkboard-user"></i></div>
+                    <div class="card-title">教師列表</div>
+                    <div class="card-desc">全校教師課表查詢</div>
+                </div>
+                <div class="feature-card" onclick="router.navigate('classes')">
+                    <div class="card-icon"><i class="fa-solid fa-users"></i></div>
+                    <div class="card-title">班級列表</div>
+                    <div class="card-desc">各年級班級課表查詢</div>
                 </div>
             </div>
-
-            <div class="nav-rows-container">
-                <div class="nav-row" id="teacher-category-nav">
-                    <!-- Categories will be injected here -->
-                </div>
-            </div>
-
-            <div id="teacher-list-container" class="class-grid">
-                <!-- Teacher items will be injected here -->
+            <div style="text-align:center; padding: 20px; color:#94a3b8; font-size:0.8em;">
+                Powered by GitHub Pages & Google Apps Script
             </div>
         </div>
-    </div>
 
-    <!-- 教師詳情 (Teacher Detail) -->
-    <div id="page-teacher-detail" class="page-view">
-        <div class="container" style="max-width: none; background: transparent; box-shadow: none; padding: 0;">
-            <div class="global-nav" style="background: white; border-radius: 12px; margin-bottom: 10px;">
-                <div class="nav-links">
-                    <a onclick="router.navigate('index')">首頁</a>
-                    <span>/</span>
-                    <a onclick="router.navigate('teachers')">教師列表</a>
-                    <span>/</span>
-                    <span class="current" id="nav-teacher-name">...</span>
-                </div>
-                <button id="print-btn-teacher" class="print-btn" onclick="window.print()">
-                    <i class="fa-solid fa-print"></i> 列印
-                </button>
-            </div>
-
-            <div class="detail-wrapper">
-                <div class="col-list">
-                    <div class="list-search-box">
-                        <input type="text" id="teacher-search-input-detail" class="list-search-input"
-                            placeholder="搜尋教師...">
-                    </div>
-                    <div class="list-scroll-area" id="teacher-list-sidebar">
-                        <!-- Sidebar items -->
+        <!-- Teachers List -->
+        <div id="page-teachers" class="page-view">
+            <div class="container">
+                <div class="global-nav">
+                    <div class="nav-links">
+                        <a onclick="router.navigate('index')">🏠 首頁</a>
+                        <span>/</span>
+                        <span class="current">教師列表</span>
                     </div>
                 </div>
+                <div class="nav-rows-container">
+                    <div class="nav-row">
+                        <button class="nav-btn active" onclick="filterTeacherList('all', '', this)">全校人員</button>
+                        <button class="nav-btn" onclick="filterTeacherList('unit', '教務處', this)">教務處</button>
+                        <button class="nav-btn" onclick="filterTeacherList('unit', '學務處', this)">學務處</button>
+                        <button class="nav-btn" onclick="filterTeacherList('unit', '總務處', this)">總務處</button>
+                        <button class="nav-btn" onclick="filterTeacherList('unit', '輔導室', this)">輔導室</button>
+                        <div class="teacher-search-box">🔍 <input id="t-search" type="text" class="teacher-search-input"
+                                placeholder="姓名..." onkeyup="filterTeacherList(lastFilter.type, lastFilter.val)"></div>
+                    </div>
+                    <div class="nav-row">
+                        <button class="nav-btn" onclick="filterTeacherList('field', '語文', this)">語文</button>
+                        <button class="nav-btn" onclick="filterTeacherList('field', '數學', this)">數學</button>
+                        <button class="nav-btn" onclick="filterTeacherList('field', '自然', this)">自然</button>
+                        <button class="nav-btn" onclick="filterTeacherList('field', '社會', this)">社會</button>
+                        <button class="nav-btn" onclick="filterTeacherList('field', '藝術與人文', this)">藝文</button>
+                        <button class="nav-btn" onclick="filterTeacherList('field', '健體', this)">健體</button>
+                    </div>
+                </div>
+                <div id="teacher-list-area"></div>
+            </div>
+        </div>
 
-                <div class="col-main">
-                    <div id="teacher-timetable-area">
-                        <h2 id="teacher-detail-title" style="text-align: center; margin-bottom: 20px;"></h2>
-                        <div class="timetable-table-wrap">
-                            <table class="timetable-table" id="teacher-timetable">
-                                <!-- Timetable built by JS -->
-                            </table>
+        <!-- Classes List -->
+        <div id="page-classes" class="page-view">
+            <div class="container">
+                <div class="global-nav">
+                    <div class="nav-links">
+                        <a onclick="router.navigate('index')">🏠 首頁</a>
+                        <span>/</span>
+                        <span class="current">班級列表</span>
+                    </div>
+                </div>
+                <div id="class-list-area"></div>
+            </div>
+        </div>
+
+        <!-- Teacher Detail -->
+        <div id="page-teacher-detail" class="page-view">
+            <div class="container" style="max-width:none; padding:10px; background:transparent; box-shadow:none;">
+                <div class="detail-wrapper">
+                    <div class="col-cats" id="t-detail-cats"></div>
+                    <div class="col-list">
+                        <div class="list-search-box"><input id="t-detail-search" type="text" class="list-search-input"
+                                placeholder="搜尋..." onkeyup="renderDetailTeacherList()"></div>
+                        <div id="t-detail-list" class="list-scroll-area"></div>
+                    </div>
+                    <div class="col-main">
+                        <div class="global-nav" style="margin-bottom:10px;">
+                            <div class="nav-links">
+                                <a onclick="router.navigate('index')">首頁</a><span>/</span><a
+                                    onclick="router.navigate('teachers')">教師</a>
+                            </div>
+                            <div style="display:flex; gap:10px;">
+                                <a id="adj-link" target="_blank" class="nav-btn" style="text-decoration:none;">⚙️
+                                    調代課</a>
+                                <button class="print-btn" onclick="window.print()">🖨️ 列印</button>
+                            </div>
                         </div>
+                        <h2 id="t-detail-title" style="text-align:center; margin-bottom:15px;"></h2>
+                        <div id="t-detail-tt"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Class Detail -->
+        <div id="page-class-detail" class="page-view">
+            <div class="container" style="max-width:none; padding:10px; background:transparent; box-shadow:none;">
+                <div class="detail-wrapper">
+                    <div class="col-class-nav">
+                        <div class="class-tabs">
+                            <div class="class-tab" onclick="switchGrade('1', this)">一年級</div>
+                            <div class="class-tab" onclick="switchGrade('2', this)">二年級</div>
+                            <div class="class-tab" onclick="switchGrade('3', this)">三年級</div>
+                        </div>
+                        <div id="c-detail-nav" class="list-scroll-area" style="padding:5px;"></div>
+                    </div>
+                    <div class="col-main">
+                        <div class="global-nav">
+                            <div class="nav-links">
+                                <a onclick="router.navigate('index')">首頁</a><span>/</span><a
+                                    onclick="router.navigate('classes')">班級</a>
+                            </div>
+                            <button class="print-btn" onclick="window.print()">🖨️ 列印</button>
+                        </div>
+                        <h2 id="c-detail-title" style="text-align:center; margin-bottom:15px;"></h2>
+                        <div id="c-detail-tt"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 班級列表 (Classes) -->
-    <div id="page-classes" class="page-view">
-        <div class="container">
-            <div class="global-nav">
-                <div class="nav-links">
-                    <a onclick="router.navigate('index')">首頁</a>
-                    <span>/</span>
-                    <span class="current">班級列表</span>
-                </div>
-            </div>
-            <div class="class-columns-container" id="class-list-container">
-                <!-- Classes injected here -->
-            </div>
-        </div>
-    </div>
-
-    <!-- 班級詳情 (Class Detail) -->
-    <div id="page-class-detail" class="page-view">
-        <div class="container">
-            <!-- Simplified class detail structure matching original logic -->
-            <div class="global-nav">
-                <div class="nav-links">
-                    <a onclick="router.navigate('index')">首頁</a>
-                    <span>/</span>
-                    <a onclick="router.navigate('classes')">班級列表</a>
-                    <span>/</span>
-                    <span class="current" id="nav-class-name">...</span>
-                </div>
-                <button class="print-btn" onclick="window.print()"><i class="fa-solid fa-print"></i> 列印</button>
-            </div>
-            <div id="class-timetable-area">
-                <h2 id="class-detail-title" style="text-align:center;"></h2>
-                <div class="timetable-table-wrap">
-                    <table class="timetable-table" id="class-timetable"></table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Core Logic -->
+    <!-- Application Logic -->
     <script>
-        // Router Logic
+        // --- Core Data & Cache ---
+        let DB = null;
+        let lastFilter = { type: 'all', val: '' };
+        let currentDetailFilter = { type: 'all', val: '' };
+        let currentTId = '';
+        let currentClassGrade = '1';
+        let currentClassCode = '';
+
+        const FECache = {
+            get: (k) => JSON.parse(localStorage.getItem('FSJH_V2_' + k) || 'null'),
+            set: (k, v) => localStorage.setItem('FSJH_V2_' + k, JSON.stringify(v)),
+            clear: () => localStorage.clear()
+        };
+
+        function initApp() {
+            // Check cache first
+            const cached = FECache.get('FULL_DB');
+            if (cached && (new Date().getTime() - cached.ts < 3600000 * 6)) { // 6hr TTL
+                DB = cached.data;
+                console.log('Loaded from cache');
+                startRouter();
+                // Background sync
+                fetchDB(true);
+            } else {
+                fetchDB();
+            }
+        }
+
+        function fetchDB(bg = false) {
+            if (!bg) document.getElementById('app-loader').style.display = 'flex';
+
+            // Call our Adapter (which calls fetch)
+            window.google.script.run.withSuccessHandler(res => {
+                if (res) {
+                    DB = res;
+                    FECache.set('FULL_DB', { ts: new Date().getTime(), data: res });
+                    if (!bg) startRouter();
+                } else {
+                    alert('資料同步失敗');
+                }
+                document.getElementById('app-loader').style.opacity = '0';
+                setTimeout(() => document.getElementById('app-loader').style.display = 'none', 500);
+            }).getFullSystemSync();
+        }
+
+        function ensureData(cb) {
+            if (DB) cb(DB);
+            else {
+                // Wait for DB (should be handled by initApp, but just in case)
+                setTimeout(() => ensureData(cb), 100);
+            }
+        }
+
+        function startRouter() {
+            applySettings();
+            // Handle URL params
+            const params = new URLSearchParams(window.location.search);
+            const page = params.get('page') || 'index';
+            const locationStart = {
+                parameter: {
+                    page: page,
+                    id: params.get('id'),
+                    code: params.get('code')
+                }
+            };
+            router.load(locationStart.parameter.page, locationStart.parameter);
+        }
+
+        function applySettings() {
+            if (DB?.settings?.schoolName) document.getElementById('home-school-name').textContent = DB.settings.schoolName + ' 課表查詢系統';
+        }
+
+        // --- Router ---
         const router = {
             navigate: function (page, params = {}) {
-                console.log('Navigate to:', page, params);
+                window.google.script.history.push(null, params, page);
+                this.load(page, params);
+                window.scrollTo(0, 0);
+            },
+            load: function (page, params) {
                 document.querySelectorAll('.page-view').forEach(el => el.classList.remove('active'));
                 const target = document.getElementById('page-' + page);
                 if (target) {
                     target.classList.add('active');
-                    this.initPage(page, params);
-                    window.scrollTo(0, 0);
+                    if (page === 'teachers') renderTeacherList();
+                    if (page === 'classes') renderClassList();
+                    if (page === 'teacher_detail') initTeacherDetail(params.id);
+                    if (page === 'class_detail') initClassDetail(params.code);
+                } else {
+                    document.getElementById('page-index').classList.add('active');
                 }
-            },
-            initPage: function (page, params) {
-                if (page === 'teachers') initTeacherList();
-                if (page === 'classes') initClassList();
-                if (page === 'teacher_detail') initTeacherDetail(params.id);
-                if (page === 'class_detail') initClassDetail(params.code);
             }
         };
 
-        // UI Initialization Functions
-        let DB = null; // Sync Data Store
+        // --- Helper: Get Display Name ---
+        function getDispName(t) {
+            if (!t) return '';
+            const settings = DB.settings || {};
+            const mode = settings.mode || 'OFF';
+            let name = t.name || t.tname || t.teacher || '';
+            let masked = t.maskedName || t.maskedTeacher || '';
+            if (!masked && name) masked = name[0] + '老師';
 
-        function initApp() {
-            ensureData((data) => {
-                console.log('System Data Loaded', data);
-                // Pre-process usually happens here
-                document.getElementById('transition-loader').classList.remove('active');
+            // In API mode, always external unless we implement IP check logic locally
+            return mode === 'ALL' ? masked : (mode === 'OFF' ? name : masked);
+        }
+
+        // --- View: Teachers List ---
+        function renderTeacherList() {
+            filterTeacherList(lastFilter.type, lastFilter.val);
+        }
+
+        window.filterTeacherList = function (type, val, btn) {
+            lastFilter = { type, val };
+            if (btn) {
+                document.querySelectorAll('#page-teachers .nav-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            }
+            const search = (document.getElementById('t-search').value || '').toLowerCase();
+
+            const scheduled = new Set(DB.schedules.map(s => s.tname));
+
+            let list = DB.teachers.filter(t => {
+                let match = true;
+                if (type !== 'all') {
+                    if (type === 'field') match = (t.field && t.field.includes(val));
+                    else match = (t[type] === val);
+                }
+                const dn = getDispName(t);
+                return match && dn.toLowerCase().includes(search);
             });
-        }
 
-        function ensureData(cb) {
-            if (DB) { cb(DB); return; }
-            fetchWithCache('getFullSystemSync', [], (data, isCached) => {
-                DB = data;
-                cb(DB);
-            }, 'FULL_SYNC');
-        }
+            // Sort
+            list.sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.unit || '').localeCompare(b.unit || ''));
 
-        function initTeacherList() {
-            ensureData(db => {
-                const container = document.getElementById('teacher-list-container');
-                container.innerHTML = db.teachers.map(t =>
-                    `<div class="class-btn" onclick="router.navigate('teacher_detail', {id: '${t.id}'})">${t.name}</div>`
-                ).join('');
+            let html = '<table class="teacher-table"><thead><tr><th>職稱</th><th>姓名</th><th>課表</th><th>單位</th></tr></thead><tbody>';
+            list.forEach(t => {
+                const has = scheduled.has(t.name);
+                html += `<tr>
+                    <td>${t.title}</td>
+                    <td>${getDispName(t)}</td>
+                    <td>${has ? `<a onclick="router.navigate('teacher_detail',{id:'${t.id}'})" style="cursor:pointer; font-size:1.2em;">📅</a>` : ''}</td>
+                    <td>${t.unit}</td>
+                </tr>`;
             });
+            document.getElementById('teacher-list-area').innerHTML = html + '</tbody></table>';
         }
 
-        function initClassList() {
-            ensureData(db => {
-                fetchWithCache('getClassList', [], (res) => {
-                    const container = document.getElementById('class-list-container');
-                    container.innerHTML = res.classes.map(c =>
-                        `<div class="class-btn digits-3" onclick="router.navigate('class_detail', {code: '${c.code}'})">${c.name}</div>`
-                    ).join('');
-                }, 'CLASS_LIST');
+        // --- View: Classes List ---
+        function renderClassList() {
+            const classCounts = new Map();
+            const classHasCore = new Map();
+            DB.schedules.forEach(s => {
+                classCounts.set(s.classCode, (classCounts.get(s.classCode) || 0) + 1);
+                // Simple heuristic for core class
+                if (s.period >= 1 && s.period <= 7) classHasCore.set(s.classCode, true);
             });
-        }
 
-        function initTeacherDetail(tid) {
-            ensureData(db => {
-                // Find teacher
-                const t = db.teachers.find(x => x.id === tid);
-                if (t) {
-                    document.getElementById('nav-teacher-name').textContent = t.name;
-                    document.getElementById('teacher-detail-title').textContent = t.name + " 課表";
-                    // Fetch Timetable Logic
-                    fetchWithCache('getTeacherTimetable', [tid], (res) => {
-                        renderTimetable(res.timetable, 'teacher-timetable');
-                    }, 'TT_' + tid);
+            // Unique classes
+            const classes = [];
+            const processed = new Set();
+            DB.schedules.forEach(s => {
+                if (!processed.has(s.classCode)) {
+                    classes.push({ code: s.classCode, name: s.className });
+                    processed.add(s.classCode);
                 }
             });
-        }
 
-        function initClassDetail(code) {
-            ensureData(db => {
-                fetchWithCache('getClassTimetable', [code], (res) => {
-                    document.getElementById('nav-class-name').textContent = res.className;
-                    document.getElementById('class-detail-title').textContent = res.className + " 課表";
-                    renderTimetable(res.timetable, 'class-timetable');
-                }, 'CT_' + code);
+            // Filter valid classes
+            const valid = classes.filter(c => classCounts.get(c.code) > 3 && classHasCore.get(c.code))
+                .sort((a, b) => a.code.localeCompare(b.code));
+
+            let html = '';
+            ['1', '2', '3'].forEach(g => {
+                html += `<div class="grade-section"><div class="grade-title">${g}年級</div><div class="class-grid">`;
+                valid.filter(c => c.code.startsWith(g)).forEach(c => {
+                    html += `<div class="class-btn" onclick="router.navigate('class_detail',{code:'${c.code}'})">${c.name}</div>`;
+                });
+                html += `</div></div>`;
             });
+            document.getElementById('class-list-area').innerHTML = html;
         }
 
-        function renderTimetable(tt, tableId) {
-            const table = document.getElementById(tableId);
-            let html = `<thead><tr><th>節</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th></tr></thead><tbody>`;
-            for (let p = 1; p <= 8; p++) {
-                html += `<tr><td class="period-label">${p}</td>`;
+        // --- View: Teacher Detail ---
+        const CATS = [
+            { label: '全校', type: 'all', val: '' },
+            { label: '教務處', type: 'unit', val: '教務處' },
+            { label: '學務處', type: 'unit', val: '學務處' },
+            { label: '一年級', type: 'unit', val: '一年級導師' },
+            { label: '二年級', type: 'unit', val: '二年級導師' },
+            { label: '三年級', type: 'unit', val: '三年級導師' },
+            { label: '國文', type: 'sub', val: '語文' },
+            { label: '數學', type: 'field', val: '數學' },
+            { label: '自然', type: 'field', val: '自然' }
+        ];
+
+        function initTeacherDetail(id) {
+            currentTId = id;
+            document.getElementById('adj-link').href = `${GAS_API_URL.replace('/exec', '')}?page=adjustment&id=${id}`;
+
+            // Render cats
+            let catHtml = '';
+            CATS.forEach(c => {
+                catHtml += `<div class="cat-btn" onclick="filterDetailTeacher('${c.type}','${c.val}', this)">${c.label}</div>`;
+            });
+            document.getElementById('t-detail-cats').innerHTML = catHtml;
+
+            renderDetailTeacherList();
+            if (id) renderTeacherTimetable(id);
+        }
+
+        window.filterDetailTeacher = function (type, val, el) {
+            currentDetailFilter = { type, val };
+            if (el) {
+                document.querySelectorAll('#t-detail-cats .cat-btn').forEach(b => b.classList.remove('active'));
+                el.classList.add('active');
+            }
+            renderDetailTeacherList();
+        }
+
+        function renderDetailTeacherList() {
+            const search = (document.getElementById('t-detail-search').value || '').toLowerCase();
+            const scheduled = new Set(DB.schedules.map(s => s.tname));
+
+            // Only show teachers with schedule in detail view
+            const list = DB.teachers.filter(t => scheduled.has(t.name)).filter(t => {
+                let match = true;
+                if (currentDetailFilter.type !== 'all') {
+                    if (currentDetailFilter.type === 'sub') match = (t.field === '語文'); // simplified
+                    else match = t[currentDetailFilter.type] === currentDetailFilter.val;
+                }
+                return match && getDispName(t).toLowerCase().includes(search);
+            });
+
+            let html = '';
+            list.forEach(t => {
+                const active = t.id === currentTId ? 'active' : '';
+                html += `<div class="list-item ${active}" id="t-item-${t.id}" onclick="router.navigate('teacher_detail',{id:'${t.id}'})">${getDispName(t)}</div>`
+            });
+            document.getElementById('t-detail-list').innerHTML = html;
+
+            if (currentTId) {
+                setTimeout(() => {
+                    const el = document.getElementById('t-item-' + currentTId);
+                    if (el) el.scrollIntoView({ block: 'center' });
+                }, 100);
+            }
+        }
+
+        function renderTeacherTimetable(id) {
+            const t = DB.teachers.find(x => x.id === id);
+            if (!t) return;
+            const tname = t.name;
+            document.getElementById('t-detail-title').textContent = getDispName(t) + ' 課表';
+
+            // Build Matrix
+            const tt = {};
+            DB.schedules.filter(s => s.tname === tname).forEach(s => {
+                if (!tt[s.day]) tt[s.day] = {};
+                tt[s.day][s.period] = s;
+            });
+
+            let html = '<div class="timetable-table-wrap"><table class="timetable-table"><thead><tr><th class="period-label">節</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th></tr></thead><tbody>';
+            for (let p = 0; p <= 8; p++) {
+                html += `<tr><td class="period-label">${p === 0 ? '早' : p}</td>`;
                 for (let d = 1; d <= 5; d++) {
-                    const lesson = (tt[d] && tt[d][p]) ? tt[d][p] : null;
-                    if (lesson) {
-                        html += `<td><span class="subject-name">${lesson.subjectName || ''}</span><span class="link-text">${lesson.className || lesson.maskedTeacher || ''}</span></td>`;
+                    const s = (tt[d] && tt[d][p]) ? tt[d][p] : null;
+                    if (s) {
+                        html += `<td><div class="subject-name">${s.subjectName}</div><a onclick="router.navigate('class_detail',{code:'${s.classCode}'})" class="link-text">${s.className}</a></td>`;
                     } else {
-                        html += `<td></td>`;
+                        html += '<td></td>';
                     }
                 }
-                html += `</tr>`;
+                html += '</tr>';
             }
-            html += `</tbody>`;
-            table.innerHTML = html;
+            document.getElementById('t-detail-tt').innerHTML = html + '</tbody></table></div>';
         }
 
-        // Start App
-        window.onload = function () {
-            initApp();
-        };
+        // --- View: Class Detail ---
+        function initClassDetail(code) {
+            currentClassCode = code;
+            if (code) currentClassGrade = code[0];
+
+            switchGrade(currentClassGrade);
+            if (code) renderClassTimetable(code);
+        }
+
+        window.switchGrade = function (g, el) {
+            currentClassGrade = g;
+            document.querySelectorAll('.class-tab').forEach(t => t.classList.remove('active'));
+            if (el) el.classList.add('active'); // simplified logic
+
+            const processed = new Set();
+            const classes = [];
+            DB.schedules.forEach(s => {
+                // Simple Count Filter again
+                if (!processed.has(s.classCode) && s.classCode.startsWith(g)) {
+                    classes.push({ code: s.classCode, name: s.className });
+                    processed.add(s.classCode);
+                }
+            });
+
+            classes.sort((a, b) => a.code.localeCompare(b.code));
+
+            let html = '<div class="class-grid" style="grid-template-columns: repeat(3, 1fr);">';
+            classes.forEach(c => {
+                const active = c.code === currentClassCode ? 'active' : '';
+                html += `<div class="class-btn-mini ${active}" onclick="router.navigate('class_detail',{code:'${c.code}'})">${c.name}</div>`;
+            });
+            document.getElementById('c-detail-nav').innerHTML = html + '</div>';
+        }
+
+        function renderClassTimetable(code) {
+            // Find class name
+            const sample = DB.schedules.find(s => s.classCode === code);
+            const className = sample ? sample.className : code;
+            document.getElementById('c-detail-title').textContent = className + ' 課表';
+
+            // Build Matrix
+            const tt = {};
+            DB.schedules.filter(s => s.classCode === code).forEach(s => {
+                if (!tt[s.day]) tt[s.day] = {};
+                tt[s.day][s.period] = s;
+            });
+
+            let html = '<div class="timetable-table-wrap"><table class="timetable-table"><thead><tr><th class="period-label">節</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th></tr></thead><tbody>';
+            for (let p = 0; p <= 8; p++) {
+                html += `<tr><td class="period-label">${p === 0 ? '早' : p}</td>`;
+                for (let d = 1; d <= 5; d++) {
+                    const s = (tt[d] && tt[d][p]) ? tt[d][p] : null;
+                    if (s) {
+                        const teacherDisp = getDispName({ name: s.tname, maskedName: s.maskedTeacher });
+                        html += `<td><div class="subject-name">${s.subjectName}</div><a onclick="router.navigate('teacher_detail',{id:'${s.tid}'})" class="link-text">${teacherDisp}</a></td>`;
+                    } else {
+                        html += '<td></td>';
+                    }
+                }
+                html += '</tr>';
+            }
+            document.getElementById('c-detail-tt').innerHTML = html + '</tbody></table></div>';
+        }
+
+        // --- Start ---
+        window.addEventListener('load', initApp);
 
     </script>
 </body>
